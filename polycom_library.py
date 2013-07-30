@@ -74,7 +74,15 @@ Line20	    Line40	DialPadPound	Backspace
 
 #Define state machine transistions
 """
-POLYCOM DEFINES THEM AS:  CallTransfer, CallConference, CallPark, CallPickup, CallHold, CallHeld, CallResume, CallWaiting, CallInfo, CallShared, CallVideo, CallDivert, CallConfHold, CallConfHeld, CallConfResume, CallRemoteActive 
+POLYCOM DEFINES THEM AS:  
+Outgoing call states: Dialtone, Setup, Ringback
+Incoming call states: Offering
+Outgoing/incoming call states: Connected, CallConference,
+CallHold, CallHeld, CallConfHold, CallConfHeld
+Line state: Active, Inactive
+Shared line states: CallRemoteActive
+Call type: Incoming, Outgoing
+
 
 HOME (DEFAULT)
 RINGING
@@ -203,39 +211,27 @@ def constructPAYLOAD(transaction, number=0):
     
   return PAYLOAD
 
+def constructCurl(payload, URL):
+  return
+
+def constructRequest(payload, URL):
+  pass
+
+def constructPoll(IP, pollType=callState):
+  pass
+
 
 
 def main():
   
   #make a phone call from 5551111 at 10.17.220.217 to 5551112 (10.17.220.218)
   
-  call(['curl', '--digest', '-u', 'Push:Push', '-d', "<PolycomIPPhone><Data priority=\"Critical\">tel:\\5551112</Data></PolycomIPPhone>", '--header', "Content-Type: application/x-com-polycom-spipx", "http://10.17.220.217/push"])
-  sleep(2)
-  #answer phone call on 5551112, at 10.17.220.217 from 5551111, and then blind transfer (sfk1, sfk3, sfk4, sfk1) to 5552112
-  call(['curl', '--digest', '-u', 'Push:Push', '-d', '<PolycomIPPhone><Data priority=\"Critical\">Key:Softkey1\nKey:Softkey3\nKey:Softkey4\nKey:Softkey1\nKey:Dialpad5\nKey:Dialpad5\nKey:Dialpad5\nKey:Dialpad2\nKey:Dialpad1\nKey:Dialpad1\nKey:Dialpad2\nKey:Softkey1</Data></PolycomIPPhone>', '--header', 'Content-Type: application/x-com-polycom-spipx', 'http://10.17.220.218/push'])
+  #call(['curl', '--digest', '-u', 'Push:Push', '-d', "<PolycomIPPhone><Data priority=\"Critical\">tel:\\5551112</Data></PolycomIPPhone>", '--header', "Content-Type: application/x-com-polycom-spipx", "http://10.17.220.217/push"])
+  #sleep(2)
+  ##answer phone call on 5551112, at 10.17.220.217 from 5551111, and then blind transfer (sfk1, sfk3, sfk4, sfk1) to 5552112
+  #call(['curl', '--digest', '-u', 'Push:Push', '-d', '<PolycomIPPhone><Data priority=\"Critical\">Key:Softkey1\nKey:Softkey3\nKey:Softkey4\nKey:Softkey1\nKey:Dialpad5\nKey:Dialpad5\nKey:Dialpad5\nKey:Dialpad2\nKey:Dialpad1\nKey:Dialpad1\nKey:Dialpad2\nKey:Softkey1</Data></PolycomIPPhone>', '--header', 'Content-Type: application/x-com-polycom-spipx', 'http://10.17.220.218/push'])
   
-  #Key:Dialpad5\nKey:Dialpad5\nKey:Dialpad5\nKey:Dialpad2\nKey:Dialpad1\nKey:Dialpad1\nKey:Dialpad2\n
-  #s=requests.Session()
-  #
-  #s.headers.update(HEADERS)
 
-  #URL=constructURL('10.17.220.217')
-  #PAYLOAD=constructPAYLOAD(CALL, '5551112')
-  #DATA=json.dumps(PAYLOAD)
-  #r=s.post(URL, auth=AUTH, verify=False, data=DATA)
-  #sleep(4)
-
-  #URL=constructURL('10.17.220.218')
-  #AUTH=digest(USER, PWD)
-  #PAYLOAD=constructPAYLOAD(ATTENDED_XFER)
-  #DATA=json.dumps(PAYLOAD)
-  #r=s.post(URL, auth=AUTH, verify=False, data=DATA)
-  #sleep(2)
-  #URL=constructURL('10.17.220.218')
-  #PAYLOAD=constructPAYLOAD(CALL, '5551112')
-  #DATA=json.dumps(PAYLOAD)
-  #r=s.post(URL, auth=AUTH, verify=False, data=DATA)
-  #sleep(2)
 
 if __name__=="__main__":
   main()
