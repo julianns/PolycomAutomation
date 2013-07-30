@@ -43,6 +43,13 @@ def main():
   r=requests.get("http://10.17.220.218/polling/callstateHandler", auth=AUTH)
   print r
   print r.text
+  
+  #make a phone call from 5551111 at 10.17.220.217 to 5551112 (10.17.220.218)
+  
+  #call(['curl', '--digest', '-u', 'Push:Push', '-d', "<PolycomIPPhone><Data priority=\"Critical\">tel:\\5551112</Data></PolycomIPPhone>", '--header', "Content-Type: application/x-com-polycom-spipx", "http://10.17.220.217/push"])
+  #sleep(2)
+  ##answer phone call on 5551112, at 10.17.220.217 from 5551111, and then blind transfer (sfk1, sfk3, sfk4, sfk1) to 5552112
+  #call(['curl', '--digest', '-u', 'Push:Push', '-d', '<PolycomIPPhone><Data priority=\"Critical\">Key:Softkey1\nKey:Softkey3\nKey:Softkey4\nKey:Softkey1\nKey:Dialpad5\nKey:Dialpad5\nKey:Dialpad5\nKey:Dialpad2\nKey:Dialpad1\nKey:Dialpad1\nKey:Dialpad2\nKey:Softkey1</Data></PolycomIPPhone>', '--header', 'Content-Type: application/x-com-polycom-spipx', 'http://10.17.220.218/push'])
 
 if __name__=="__main__":
   main()
