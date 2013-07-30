@@ -27,7 +27,10 @@ import json
 from requests.auth import HTTPDigestAuth as digest
 from time import sleep
 from subprocess import call
+import re
 
+#REFERENCE:  PAYLOAD=r"<PolycomIPPhone><Data priority=\"Critical\">tel:\\5552112</Data></PolycomIPPhone>"
+#REFERENCE:  URL=r"http://10.17.220.10/push"
 
 #local libraries
 #import PolycomStateMachine
@@ -40,11 +43,10 @@ PWD='Push'
 AUTH=digest(USER, PWD)
 URL_A=r"http://"
 URL_B=r"/push"
-URL=r"http://10.17.220.10/push"
 HEADERS={"Content-Type":"application/x-com-polycom-spipx", "User-Agent":"Voice DVT Automation"}
 PAYLOAD_A=r"<PolycomIPPhone><Data priority=\"Critical\">"
 PAYLOAD_B=r"</Data></PolycomIPPhone>"
-PAYLOAD=r"<PolycomIPPhone><Data priority=\"Critical\">tel:\\5552112</Data></PolycomIPPhone>"
+
 CALL,ATTENDED_XFER,UNATTENDED_XFER,BLIND_XFER,CONF,CONNECT,DISCONNECT=[0,1,2,3,4,5,6]
 
 """
@@ -95,17 +97,31 @@ UNATTENDEDTRANSFER
 DISCONNECT
 """
 
-def go_home(ip):
+def isHome(ip):
   """
-  Sets phone at IP back to home screen
-  STATE==?=>HOME
+  returns true if phone is on default page (not settings)
+  ***STILL NOT REALLY SURE HOW TO DO THIS****
   """
-  pass
+
 
 def isRinging(ip):
   """
   Returns True if phone has incoming call, else False
   STATE==?=>INCOMING
+  """
+  pass
+
+def isActive(ip):
+  """
+  Returns True if phone has active call, else False
+  STATE==?=>ACTIVE
+  """
+  pass
+
+def go_home(ip):
+  """
+  Sets phone at IP back to home screen
+  STATE==?=>HOME
   """
   pass
 
@@ -116,13 +132,6 @@ def connect():
   STATE==INCOMING=>ACTIVE
   """
   return "Key:Handsfree"
-
-def isActive(ip):
-  """
-  Returns True if phone has active call, else False
-  STATE==?=>ACTIVE
-  """
-  pass
 
 def transfer(ip, number):
   """
@@ -159,7 +168,7 @@ def disconnect(ip):
   """
   pass
 
-def constructURL(ip):
+def constructPushURL(ip):
   """
   Given an ip address, constructs a properly formatted URL
   """
@@ -173,10 +182,15 @@ def constructDialPadString(number):
  
 #Assumes Softkey3 transfers; maybe pass in IP address and request type from phone
 def transfer(method):
-  if method=="Softkey":
+  if method=="softkey":
     return "Key:Softkey3"
   elif method=="hardkey":
     return "Key:Transfer"
+
+def getCallState(ip):
+  """
+  polls phone at ip, returns call state
+  """
 
 
 def constructPAYLOAD(transaction, number=0):
@@ -211,25 +225,65 @@ def constructPAYLOAD(transaction, number=0):
     
   return PAYLOAD
 
-def constructCurl(payload, URL):
-  return
+def sendCurl(payload, URL):
+  return 
 
-def constructRequest(payload, URL):
-  pass
+def sendRequest(payload, URL):
+  
+  DATA=json.dumps(payload)
+  return requests.post(URL, auth=AUTH, verify=False, data=DATA, headers=HEADERS)
+   
 
-def constructPoll(IP, pollType=callState):
-  pass
+def sendPoll(IP, pollType="callstate"):
+  """
+  The handlers Polycom offers are:
+  polling/callStateHandler
+  polling/deviceHandler
+  polling/networkHandler
+  """
+  global AUTH
+  payload="http://" + IP + "/polling/"+pollType+"Handler"
+  XMLstring= requests.get(payload, auth=AUTH).text.splitlines()
+  pattern=re.compile(r".*<(.*)>(.*)<.*")
+  for line in XMLstring:
+    m=pattern.match(line)
+    if m:
+      print m.group(1) + " : " +m.group(2)
+      
+  
+
+  
+ 
+  #print tree[0][2].text
+  #state={}
+  #if pollType=="callstate":
+  #  state.update({"LineKeyNum": tree[0][0].text,
+  #                "LineDirNum": tree[0][1].text,
+  #                "LineState": tree[0][2].text})
+  #  
+  #  if state["LineState"]=="Active":
+  #    pass
+  #return tree
+      
+    
+  
+
 
 
 
 def main():
+  state=sendPoll("10.17.220.218")
+  #print state["LineState"]
+  #print state["LineDirNum"]
+
   
-  #make a phone call from 5551111 at 10.17.220.217 to 5551112 (10.17.220.218)
+    
+  #print state["LineState"]
   
-  #call(['curl', '--digest', '-u', 'Push:Push', '-d', "<PolycomIPPhone><Data priority=\"Critical\">tel:\\5551112</Data></PolycomIPPhone>", '--header', "Content-Type: application/x-com-polycom-spipx", "http://10.17.220.217/push"])
-  #sleep(2)
-  ##answer phone call on 5551112, at 10.17.220.217 from 5551111, and then blind transfer (sfk1, sfk3, sfk4, sfk1) to 5552112
-  #call(['curl', '--digest', '-u', 'Push:Push', '-d', '<PolycomIPPhone><Data priority=\"Critical\">Key:Softkey1\nKey:Softkey3\nKey:Softkey4\nKey:Softkey1\nKey:Dialpad5\nKey:Dialpad5\nKey:Dialpad5\nKey:Dialpad2\nKey:Dialpad1\nKey:Dialpad1\nKey:Dialpad2\nKey:Softkey1</Data></PolycomIPPhone>', '--header', 'Content-Type: application/x-com-polycom-spipx', 'http://10.17.220.218/push'])
+  
+  
+
+
   
 
 
