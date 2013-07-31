@@ -36,11 +36,13 @@
 #
 ################################################################################
 
+###Requires requests : sudo apt-get install python-requests
+
 import requests
 import json
 from requests.auth import HTTPDigestAuth as digest
 from time import sleep
-from subprocess import call
+from subprocess import call as syscall
 import re
 
 #Set globals
@@ -49,9 +51,10 @@ PWD='Push'
 AUTH=digest(USER, PWD)
 URL_A=r"http://"
 URL_B=r"/push"
-HEADERS={"Content-Type":"application/x-com-polycom-spipx", "User-Agent":"Voice DVT Automation"}
-PAYLOAD_A=r"<PolycomIPPhone><Data priority=\"Critical\">"
-PAYLOAD_B=r"</Data></PolycomIPPhone>"
+HEADERA="Content-Type: application/x-com-polycom-spipx"
+HEADERB="User-Agent: DVT User Agent"
+PAYLOAD_A="<PolycomIPPhone><Data priority=\"Critical\">"
+PAYLOAD_B="</Data></PolycomIPPhone>"
 
 #Define state machine transistions
 """
@@ -100,7 +103,12 @@ def isRinging(ip):
   Returns True if phone has incoming call, else False
   """
   state=sendPoll(ip)
-  return["CallState"]=="Offering"
+  try:
+    #print state["CallState"]
+    return state["CallState"]=="Offering"
+  except Exception:
+    return False
+
 
 def isConnected(ip):
   """
@@ -117,9 +125,11 @@ def call(ip, number):
   TODO:  Returns -1 if no registered line is inactive or if push message rejected 
   """
   URL=constructPushURL(ip)
-  PAYLOAD=(PAYLOAD_A + "tel:\\" + number + PAYLOAD_B)
+  #command="Key:Softkey1\n"+constructDialPadString(number)+"Key:Softkey2"
+  PAYLOAD=(PAYLOAD_A + "tel:\\"+number+ PAYLOAD_B)
   if not isActive(ip):
-    result=sendRequest(PAYLOAD, URL)
+    #result=sendRequest(PAYLOAD, URL)
+    result=sendCurl(PAYLOAD, URL)
   else:
     return -1
   
@@ -128,11 +138,16 @@ def connect(ip):
   IFF isRinging(ip)?TRUE==>isActive(ip)
   STATE==OFFERING=>ACTIVE
   """
-  state=sendPoll(ip)
-  if state["CallState"]=="Offering":
-    PAYLOAD=(PAYLOAD_A+"Key:Handsfree"+PAYLOAD_B)
-    URL=constructPushURL(ip)
-    sendCurl(PAYLOAD, URL)
+  callstate=""
+  while callstate!="Offering":
+    try:
+      state=sendPoll(ip)
+      callstate=state["CallState"]
+    except Exception:
+      pass  
+  PAYLOAD=(PAYLOAD_A+"Key:Handsfree"+PAYLOAD_B)
+  URL=constructPushURL(ip)
+  sendCurl(PAYLOAD, URL)
 
 def disconnect(ip):
   """
@@ -143,70 +158,89 @@ def disconnect(ip):
   state=sendPoll(ip)
   #Lets not test for connected call, rather test the line
   #Active line state covers all call states 
-  if state["LineState"]=="Active":
+  try:
+    if state["LineState"]=="Active":
+      PAYLOAD=(PAYLOAD_A+"Key:Softkey2"+PAYLOAD_B)
+      URL=constructPushURL(ip)
+      sendCurl(PAYLOAD, URL)
+  except Exception:
+    
     PAYLOAD=(PAYLOAD_A+"Key:Softkey2"+PAYLOAD_B)
     URL=constructPushURL(ip)
     sendCurl(PAYLOAD, URL)
 
-def transfer(ipA, number, ipB):
+def transfer(ipA, number, ipC):
   """
   IFF isActive(ipA)?TRUE==>transfer
   From active call, performs attended transfer to number
   """
   state=sendPoll(ipA)
-  if state["CallState"]=="Active":
+  if state["LineState"]=="Active":
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     URL=constructPushURL(ipA)
     sendCurl(PAYLOAD, URL)
     call(ipA, number)
-    while not isRinging(ipB):
+    while not isRinging(ipC):
       sleep(1)
-    connect(ipB)
-    while not isConnected(ipB):
-      sleep(1)
+    connect(ipC)
+    sleep(3)
+    #while not isConnected(ipB):
+    #  sleep(1)
+    PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
+    URL=constructPushURL(ipA)
+    sendCurl(PAYLOAD, URL)    
     disconnect(ipA)
     
-def unattendedTransfer(ipA, number, ipB):
+def unattendedTransfer(ipA, number, ipC):
   """
   IFF isActive(ipA)?TRUE==>transfer
   From active call, performs unattended transfer to number
   """
   state=sendPoll(ipA)
-  if state["CallState"]=="Active":
+  if state["LineState"]=="Active":
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     URL=constructPushURL(ipA)
     sendCurl(PAYLOAD, URL)
     call(ipA, number)
-    while not isRingBack(ipA):
-      sleep(1)
+    PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
+    URL=constructPushURL(ipA)
+    sendCurl(PAYLOAD, URL)
     disconnect(ipA)
-    while not isRinging(ipB):
+    while not isRinging(ipC):
       sleep(1)
-    connect(ipB)
-    while not isConnected(ipB):
-      sleep(1)
+    connect(ipC)
+    #while not isConnected(ipC):
+    #  sleep(1)
+    PAYLOAD=(PAYLOAD_A+"Key:Softkey3"+PAYLOAD_B)
+    sendCurl(PAYLOAD, URL)
 
-def blindTransfer(ipA, number, ipB):
+def blindTransfer(ipA, number, ipC):
   """
   IFF isActive(ipA)?TRUE==>transfer
   From active call, performs blind transfer to number
   """
   state=sendPoll(ipA)
-  if state["CallState"]=="Active":
+  if state["LineState"]=="Active":
     URL=constructPushURL(ipA)
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     sendCurl(PAYLOAD, URL)
+    sleep(3)
     PAYLOAD=(PAYLOAD_A+"Key:Softkey4"+PAYLOAD_B)
     sendCurl(PAYLOAD, URL)
     PAYLOAD=(PAYLOAD_A+"Key:Softkey1"+PAYLOAD_B)
     sendCurl(PAYLOAD, URL)
     call(ipA, number)
+    sleep(1)
     disconnect(ipA)
-    while not isRinging(ipB):
-      sleep(1)
-    connect(ipB)
-    while not isConnected(ipB):
-      sleep(1)
+    sleep(1)
+    #while not isRinging(ipC):
+    #  sleep(1)
+    connect(ipC)
+    #while not isConnected(ipC):
+    #  sleep(1)
+    URL=constructPushURL(ipA)
+    PAYLOAD=(PAYLOAD_A+"Key:Softkey3"+PAYLOAD_B)
+    sendCurl(PAYLOAD, URL)
 
 
 ###????TODO????###  I think this should stay separate from the initial call; 
@@ -215,20 +249,22 @@ def blindTransfer(ipA, number, ipB):
 #                   of the three IP, and they won't give conf without the third
 def conference(ipA, number, ipB):
   """
-  IFF isActive(ipA): conference with number
+  IFF connected: conference with number
   From active call, conferences with number
   """
   state=sendPoll(ipA)
-  if state["CallState"]=="Active":
+  if state["CallState"]=="Connected":
     PAYLOAD=(PAYLOAD_A+"Key:Conference"+PAYLOAD_B)
     URL=constructPushURL(ipA)
     sendCurl(PAYLOAD, URL)
     call(ipA, number)
+    sleep(3)
     while not isRinging(ipB):
       sleep(1)
     connect(ipB)
-    while not isConnected(ipB):
-      sleep(1)
+    #while not isConnected(ipB):
+    #  sleep(1)
+    sleep(3)
     PAYLOAD=(PAYLOAD_A+"Key:Conference"+PAYLOAD_B)
     URL=constructPushURL(ipA)
     sendCurl(PAYLOAD, URL)
@@ -251,8 +287,9 @@ def sendCurl(PAYLOAD, URL):
   global USER
   global PWD
   AUTH=USER+":"+PWD
-  curl=['curl', '--digest', '-u', AUTH, '-d', PAYLOAD, '-H', HEADERS[0], '-H', HEADERS[1], URL]
-  return call(curl)
+  curl=['curl', '--digest', '-u', AUTH, '-d', PAYLOAD, '--header', HEADERA , '--header', HEADERB , URL]
+  #print curl
+  return syscall(curl)
 
 def sendRequest(payload, URL):
   global HEADERS
@@ -281,6 +318,11 @@ def sendPoll(IP, pollType="callstate"):
 def main():
   #from 
   state=sendPoll("10.17.220.218")
+  for  key, value in state.iteritems():
+    print '%s : %s' %(key, value)
+  
+  #call("10.17.220.217", "5551112")
+  #syscall(['curl', '--digest', '-u', 'Push:Push', '-d', '<PolycomIPPhone><Data priority="Critical">tel:\\5551112</Data></PolycomIPPhone>', '--header', r'Content-Type: application/x-com-polycom-spipx', r'http://10.17.220.217/push'])
 
   
 
