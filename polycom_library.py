@@ -73,6 +73,7 @@ def isHome(ip):
   returns true if phone is on default page (not settings)
   ***STILL NOT REALLY SURE HOW TO DO THIS****
   """
+  pass
 def goHome(ip):
   """
   Sets phone at IP back to home screen
