@@ -22,20 +22,26 @@
 #  Readability counts
 #
 ###############################################################################
+#REFERENCE:  curl --digest -u Push:Push -d "<PolycomIPPhone><Data priority="all">tel:\\8500</Data></PolycomIPPhone>" /
+#                 --header "Content-Type: application/x-com-polycom-spipx" http://10.17.220.17/push
+#
+#REFERENCE:  requests.post(r"http://10.17.220.10/push", auth=digest("Push", "Push"), verify=False, data=DATA,
+#                          headers={"Content-Type":"application/x-com-polycom-spipx", "User-Agent":"Voice DVT Automation"})
+#
+#REFERENCE:  PAYLOAD=r"<PolycomIPPhone><Data priority=\"Critical\">tel:\\5552112</Data></PolycomIPPhone>"
+#REFERENCE:  URL=r"http://10.17.220.10/push"
+#
+#TODO:  convert functions to OOP, the PHONE class, then when we add other phones we can inherit and override
+#       the necessary functions if state machine differs
+#
+################################################################################
+
 import requests
 import json
 from requests.auth import HTTPDigestAuth as digest
 from time import sleep
 from subprocess import call
 import re
-
-#REFERENCE:  PAYLOAD=r"<PolycomIPPhone><Data priority=\"Critical\">tel:\\5552112</Data></PolycomIPPhone>"
-#REFERENCE:  URL=r"http://10.17.220.10/push"
-
-#local libraries
-#import PolycomStateMachine
-
-
 
 #Set globals
 USER='Push'
@@ -47,36 +53,8 @@ HEADERS={"Content-Type":"application/x-com-polycom-spipx", "User-Agent":"Voice D
 PAYLOAD_A=r"<PolycomIPPhone><Data priority=\"Critical\">"
 PAYLOAD_B=r"</Data></PolycomIPPhone>"
 
-CALL,ATTENDED_XFER,UNATTENDED_XFER,BLIND_XFER,CONF,CONNECT,DISCONNECT=[0,1,2,3,4,5,6]
-
-"""
-Keys for VVX400 and VVX500 series:
-
-Line1	    Line21	Line41	        Softkey1	DoNotDisturb
-Line2	    Line22	Line42	        Softkey2	Select
-Line3	    Line23	Line43	        Softkey3	Conference
-Line4	    Line24	Line44	        Softkey4	Transfer
-Line5	    Line25	Line45	        Softkey5	Redial
-Line6	    Line26	Line46	        VolDown	        Hold
-Line7	    Line27	Line47	        VolUp	        Status
-Line8	    Line28	Line48	        Headset	        Call List
-Line9	    Line29	Dialpad0	Handsfree	 
-Line10	    Line30	Dialpad1	MicMute	 
-Line11	    Line31	Dialpad2	Menu	 
-Line12	    Line32	Dialpad3	Messages	 
-Line13	    Line33	Dialpad4	Applications	 
-Line14	    Line34	Dialpad5	Directories	 
-Line15	    Line35	Dialpad6	Setup	 
-Line16	    Line36	Dialpad7	ArrowUp	 
-Line17	    Line37	Dialpad8	ArrowDown	 
-Line18	    Line38	Dialpad9	ArrowLeft	 
-Line19	    Line39	DialPadStar	ArrowRight	 
-Line20	    Line40	DialPadPound	Backspace
-"""
-
 #Define state machine transistions
 """
-POLYCOM DEFINES THEM AS:  
 Outgoing call states: Dialtone, Setup, Ringback
 Incoming call states: Offering
 Outgoing/incoming call states: Connected, CallConference,
@@ -85,16 +63,9 @@ Line state: Active, Inactive
 Shared line states: CallRemoteActive
 Call type: Incoming, Outgoing
 
-
-HOME (DEFAULT)
-RINGING
-INCOMING
-ACTIVE
-HOLD
-ATTENDEDTRANSFER
-BLINDTRANSFER
-UNATTENDEDTRANSFER
-DISCONNECT
+!!!!!!TODO!!!!!!  If I return a callstate poll and the line is inactive
+!!!!!!TODO!!!!!!     then make sure I am testing any call state checks
+!!!!!!TODO!!!!!!     to handle 'None'; positive tests should serve
 """
 
 def isHome(ip):
@@ -102,76 +73,170 @@ def isHome(ip):
   returns true if phone is on default page (not settings)
   ***STILL NOT REALLY SURE HOW TO DO THIS****
   """
-
-
-def isRinging(ip):
+def goHome(ip):
   """
-  Returns True if phone has incoming call, else False
-  STATE==?=>INCOMING
+  Sets phone at IP back to home screen
+  ***STILL NOT REALLY SURE HOW TO DO THIS****
   """
   pass
 
 def isActive(ip):
   """
-  Returns True if phone has active call, else False
-  STATE==?=>ACTIVE
+  Returns True if line state is Active, else False
   """
-  pass
+  state=sendPoll(ip)
+  return["LineState"]=="Active"
 
-def go_home(ip):
+def isRingback(ip):
   """
-  Sets phone at IP back to home screen
-  STATE==?=>HOME
+  Returns True if call state is RingBack, else False
   """
-  pass
+  state=sendPoll(ip)
+  return["CallState"]=="RingBack"
 
-#Assumes Softkey1 connects; maybe pass in IP address and request type from phone
-def connect():
+def isRinging(ip):
   """
-  IFF isRinging(ip): answers phone
-  STATE==INCOMING=>ACTIVE
+  Returns True if phone has incoming call, else False
   """
-  return "Key:Handsfree"
+  state=sendPoll(ip)
+  return["CallState"]=="Offering"
 
-def transfer(ip, number):
+def isConnected(ip):
   """
-  IFF isActive(ip): transfer call
+  Returns True if line state is Active, else False
+  """
+  state=sendPoll(ip)
+  return["CallState"]=="Connected"
+
+def call(ip, number):
+  """
+  IFF LineState?INACTIVE==>DIALTONE->SETUP->RINGBACK
+  Given the ip address of the phone from which to call and a number to call
+  calls number
+  TODO:  Returns -1 if no registered line is inactive or if push message rejected 
+  """
+  URL=constructURL(ip)
+  PAYLOAD=(PAYLOAD_A + "tel:\\" + number + PAYLOAD_B)
+  if not isActive(ip):
+    result=sendRequest(PAYLOAD, URL)
+  else:
+    return -1
+  
+def connect(ip):
+  """
+  IFF isRinging(ip)?TRUE==>isActive(ip)
+  STATE==OFFERING=>ACTIVE
+  """
+  state=sendPoll(ip)
+  if state["CallState"]=="Offering":
+    PAYLOAD=(PAYLOAD_A+"Key:Handsfree"+PAYLOAD_B)
+    URL=constructURL(ip)
+    sendCurl(PAYLOAD, URL)
+
+def disconnect(ip):
+  """
+  IFF isConnected(ip)?TRUE==>isActive(ip)?FALSE
+  STATE==CONNECTED=>INACTIVE
+  ???Can we reliably use the HandsFree key if we use it to answer the phone initially???
+  """
+  state=sendPoll(ip)
+  #Lets not test for connected call, rather test the line
+  #Active line state covers all call states 
+  if state["LineState"]=="Active":
+    PAYLOAD=(PAYLOAD_A+"Key:Softkey2"+PAYLOAD_B)
+    URL=constructURL(ip)
+    sendCurl(PAYLOAD, URL)
+
+def transfer(ipA, number, ipB):
+  """
+  IFF isActive(ip)?TRUE==>transfer
   From active call, performs attended transfer to number
   """
-  pass
-
-def unattendedTransfer(ip, number):
+  state=sendPoll(ip)
+  if state["CallState"]=="Active":
+    PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
+    URL=constructURL(ipA)
+    sendCurl(PAYLOAD, URL)
+    call(ipA, number)
+    while not isRinging(ipB):
+      sleep(1)
+    connect(ipB)
+    while not isConnected(ipB):
+      sleep(1)
+    disconnect(ipA)
+    
+def unattendedTransfer(ipA, number, ipB):
   """
-  IFF isActive(ip): transfer call
+  IFF isActive(ip)?TRUE==>transfer
   From active call, performs unattended transfer to number
   """
-  pass
+  state=sendPoll(ip)
+  if state["CallState"]=="Active":
+    PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
+    URL=constructURL(ipA)
+    sendCurl(PAYLOAD, URL)
+    call(ipA, number)
+    while not isRingBack(ip):
+      sleep(1)
+    disconnect(ipA)
+    while not isRinging(ipB):
+      sleep(1)
+    connect(ipB)
+    while not isConnected(ipB):
+      sleep(1)
 
-def blindTransfer(ip, number):
+def blindTransfer(ipA, number, ipB):
   """
-  IFF isActive(ip): transfer call
+  IFF isActive(ip)?TRUE==>transfer
   From active call, performs blind transfer to number
   """
-  pass
+  state=sendPoll(ip)
+  if state["CallState"]=="Active":
+    URL=constructURL(ipA)
+    PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
+    sendCurl(PAYLOAD, URL)
+    PAYLOAD=(PAYLOAD_A+"Key:Softkey4"+PAYLOAD_B)
+    sendCurl(PAYLOAD, URL)
+    PAYLOAD=(PAYLOAD_A+"Key:Softkey1"+PAYLOAD_B)
+    sendCurl(PAYLOAD, URL)
+    call(ipA, number)
+    disconnect(ipA)
+    while not isRinging(ipB):
+      sleep(1)
+    connect(ipB)
+    while not isConnected(ipB):
+      sleep(1)
 
-def conference(ip, number):
+
+###????TODO????###  I think this should stay separate from the initial call; 
+#                   The only downside is I can't check all three phones for conf state
+#                   unless I send in the extra ip, but I can get confirmation from two
+#                   of the three IP, and they won't give conf without the third
+def conference(ipA, number, ipB):
   """
   IFF isActive(ip): conference with number
   From active call, conferences with number
   """
-  pass
-
-def disconnect(ip):
-  """
-  IFF isActive(ip): disconnect
-  From active call, disconnect
-  """
-  pass
+  state=sendPoll(ip)
+  if state["CallState"]=="Active":
+    PAYLOAD=(PAYLOAD_A+"Key:Conference"+PAYLOAD_B)
+    URL=constructURL(ipA)
+    sendCurl(PAYLOAD, URL)
+    call(ipA, number)
+    while not isRinging(ipB):
+      sleep(1)
+    connect(ipB)
+    while not isConnected(ipB):
+      sleep(1)
+    PAYLOAD=(PAYLOAD_A+"Key:Conference"+PAYLOAD_B)
+    URL=constructURL(ipA)
+    sendCurl(PAYLOAD, URL)
+    
 
 def constructPushURL(ip):
   """
-  Given an ip address, constructs a properly formatted URL
-  """
+  Given IP address returns properly constructed push URL
+  """ 
   return (URL_A + ip + URL_B)
 
 def constructDialPadString(number):
@@ -180,60 +245,20 @@ def constructDialPadString(number):
     dialPadString+="Key:Dialpad"+n+"\n"
   return dialPadString
  
-#Assumes Softkey3 transfers; maybe pass in IP address and request type from phone
-def transfer(method):
-  if method=="softkey":
-    return "Key:Softkey3"
-  elif method=="hardkey":
-    return "Key:Transfer"
-
-def getCallState(ip):
-  """
-  polls phone at ip, returns call state
-  """
-
-
-def constructPAYLOAD(transaction, number=0):
-  """
-  Given a phone number, constructs the proper payload based on transaction type
-  ATTENDED_XFER,UNATTENDED_XFER,BLIND_XFER,CONFERENCE,CONNECT,DISCONNECT
-  TODO: VAlidation for when a number is required
-  """
-  if transaction==CALL:
-    #Assumes STATE==HOME
-    PAYLOAD= (PAYLOAD_A + "tel:\\" + number + PAYLOAD_B)
-  elif transaction==CONNECT:
-    #Assumes STATE==INCOMING
-    PAYLOAD= (PAYLOAD_A + connect() + PAYLOAD_B)
- 
-  elif transaction==ATTENDED_XFER:
-    #Assumes STATE==ACTIVE
-    PAYLOAD= (PAYLOAD_A + transfer('Softkey') + PAYLOAD_B)
-
-  elif transaction==UNATTENDED_XFER:
-    #Assumes STATE==ACTIVE
-    pass
-  elif transaction==BLIND_XFER:
-    #Assumes STATE==ACTIVE
-    pass
-  elif transaction==CONFERENCE:
-    #Assumes STATE==ACTIVE
-    pass
-  elif transaction==DISCONNECT:
-    #Assumes STATE==ACTIVE
-    pass
-    
-  return PAYLOAD
-
-def sendCurl(payload, URL):
-  return 
+def sendCurl(PAYLOAD, URL):
+  global HEADERS
+  global USER
+  global PWD
+  AUTH=USER+":"+PWD
+  curl=['curl', '--digest', '-u', AUTH, '-d', PAYLOAD, '-H', HEADERS[0], '-H', HEADERS[1], URL]
+  return call(curl)
 
 def sendRequest(payload, URL):
-  
+  global HEADERS
+  global AUTH
   DATA=json.dumps(payload)
   return requests.post(URL, auth=AUTH, verify=False, data=DATA, headers=HEADERS)
    
-
 def sendPoll(IP, pollType="callstate"):
   """
   The handlers Polycom offers are:
@@ -245,40 +270,19 @@ def sendPoll(IP, pollType="callstate"):
   payload="http://" + IP + "/polling/"+pollType+"Handler"
   XMLstring= requests.get(payload, auth=AUTH).text.splitlines()
   pattern=re.compile(r".*<(.*)>(.*)<.*")
+  state={}
   for line in XMLstring:
     m=pattern.match(line)
     if m:
-      print m.group(1) + " : " +m.group(2)
-      
-  
-
-  
- 
-  #print tree[0][2].text
-  #state={}
-  #if pollType=="callstate":
-  #  state.update({"LineKeyNum": tree[0][0].text,
-  #                "LineDirNum": tree[0][1].text,
-  #                "LineState": tree[0][2].text})
-  #  
-  #  if state["LineState"]=="Active":
-  #    pass
-  #return tree
-      
-    
-  
-
-
-
+      state.append({m.group(1):m.group(2)})
+  return state    
 
 def main():
+  #from 
   state=sendPoll("10.17.220.218")
-  #print state["LineState"]
-  #print state["LineDirNum"]
 
   
-    
-  #print state["LineState"]
+
   
   
   
