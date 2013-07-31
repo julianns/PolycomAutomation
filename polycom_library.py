@@ -116,7 +116,7 @@ def call(ip, number):
   calls number
   TODO:  Returns -1 if no registered line is inactive or if push message rejected 
   """
-  URL=constructURL(ip)
+  URL=constructPushURL(ip)
   PAYLOAD=(PAYLOAD_A + "tel:\\" + number + PAYLOAD_B)
   if not isActive(ip):
     result=sendRequest(PAYLOAD, URL)
@@ -131,7 +131,7 @@ def connect(ip):
   state=sendPoll(ip)
   if state["CallState"]=="Offering":
     PAYLOAD=(PAYLOAD_A+"Key:Handsfree"+PAYLOAD_B)
-    URL=constructURL(ip)
+    URL=constructPushURL(ip)
     sendCurl(PAYLOAD, URL)
 
 def disconnect(ip):
@@ -145,18 +145,18 @@ def disconnect(ip):
   #Active line state covers all call states 
   if state["LineState"]=="Active":
     PAYLOAD=(PAYLOAD_A+"Key:Softkey2"+PAYLOAD_B)
-    URL=constructURL(ip)
+    URL=constructPushURL(ip)
     sendCurl(PAYLOAD, URL)
 
 def transfer(ipA, number, ipB):
   """
-  IFF isActive(ip)?TRUE==>transfer
+  IFF isActive(ipA)?TRUE==>transfer
   From active call, performs attended transfer to number
   """
-  state=sendPoll(ip)
+  state=sendPoll(ipA)
   if state["CallState"]=="Active":
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
-    URL=constructURL(ipA)
+    URL=constructPushURL(ipA)
     sendCurl(PAYLOAD, URL)
     call(ipA, number)
     while not isRinging(ipB):
@@ -168,16 +168,16 @@ def transfer(ipA, number, ipB):
     
 def unattendedTransfer(ipA, number, ipB):
   """
-  IFF isActive(ip)?TRUE==>transfer
+  IFF isActive(ipA)?TRUE==>transfer
   From active call, performs unattended transfer to number
   """
-  state=sendPoll(ip)
+  state=sendPoll(ipA)
   if state["CallState"]=="Active":
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
-    URL=constructURL(ipA)
+    URL=constructPushURL(ipA)
     sendCurl(PAYLOAD, URL)
     call(ipA, number)
-    while not isRingBack(ip):
+    while not isRingBack(ipA):
       sleep(1)
     disconnect(ipA)
     while not isRinging(ipB):
@@ -188,12 +188,12 @@ def unattendedTransfer(ipA, number, ipB):
 
 def blindTransfer(ipA, number, ipB):
   """
-  IFF isActive(ip)?TRUE==>transfer
+  IFF isActive(ipA)?TRUE==>transfer
   From active call, performs blind transfer to number
   """
-  state=sendPoll(ip)
+  state=sendPoll(ipA)
   if state["CallState"]=="Active":
-    URL=constructURL(ipA)
+    URL=constructPushURL(ipA)
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     sendCurl(PAYLOAD, URL)
     PAYLOAD=(PAYLOAD_A+"Key:Softkey4"+PAYLOAD_B)
@@ -215,13 +215,13 @@ def blindTransfer(ipA, number, ipB):
 #                   of the three IP, and they won't give conf without the third
 def conference(ipA, number, ipB):
   """
-  IFF isActive(ip): conference with number
+  IFF isActive(ipA): conference with number
   From active call, conferences with number
   """
-  state=sendPoll(ip)
+  state=sendPoll(ipA)
   if state["CallState"]=="Active":
     PAYLOAD=(PAYLOAD_A+"Key:Conference"+PAYLOAD_B)
-    URL=constructURL(ipA)
+    URL=constructPushURL(ipA)
     sendCurl(PAYLOAD, URL)
     call(ipA, number)
     while not isRinging(ipB):
@@ -230,7 +230,7 @@ def conference(ipA, number, ipB):
     while not isConnected(ipB):
       sleep(1)
     PAYLOAD=(PAYLOAD_A+"Key:Conference"+PAYLOAD_B)
-    URL=constructURL(ipA)
+    URL=constructPushURL(ipA)
     sendCurl(PAYLOAD, URL)
     
 
@@ -275,7 +275,7 @@ def sendPoll(IP, pollType="callstate"):
   for line in XMLstring:
     m=pattern.match(line)
     if m:
-      state.append({m.group(1):m.group(2)})
+      state.update({m.group(1):m.group(2)})
   return state    
 
 def main():
