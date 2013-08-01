@@ -15,6 +15,7 @@
 # Author Jeffrey McAnarney from U.S. 7/31/2013
 ###############################################################################
 
+import logging
 from polycom_library import *  #allows me to reference library functions without namespace
 
 #just so I can avoid quotes in all my keys
@@ -30,19 +31,13 @@ C={name:"Getty Lee", IP:"10.17.220.219", number:"5552112"}
 
 def normal_call(A, B):
   result=call(A[IP], B[number])
-  while not isRinging(B[IP]):
+  while not isRinging(B[IP]): 
     sleep(1)
   connect(B[IP])
-  connected=isConnected(A[IP]) and isConnected(B[IP])
-  if connected:
-    print "%s is talking to %s" % (A[name], B[name])
-  else:
-    print "A reports %s and B reports %s" %(isConnected(A[IP]) , isConnected(B[IP]))
+#  connected=isConnected(A[IP]) and isConnected(B[IP])
   sleep(10)
   disconnect(A[IP])
   disconnect(B[IP])
-  
-  
   
 def conference_call(A,B,C):
   call(A[IP], B[number])
@@ -65,9 +60,7 @@ def attended_transfer_call(A,B,C):
   sleep(5)
   disconnect(B[IP])
   disconnect(C[IP])
-  
-  
-  
+ 
 def unattended_transfer_call(A,B,C):
   call(A[IP], B[number])
   while not isRinging(B[IP]):
@@ -88,14 +81,23 @@ def blind_transfer_call(A,B,C):
   disconnect(B[IP])
   disconnect(C[IP])
 
+def setupLogging():
+  #setup basic logging configuration
+  logging.basicConfig(level=logging.INFO,
+                      format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                      datefmt='%m-%d %H:%M',
+                      filename='POC.log',
+                      filemode='w')
+  
 
 
 def main():
-  normal_call(A,B)
+  lg=setupLogging()
+  #normal_call(A,B)
   sleep(5)
   attended_transfer_call(A,B,C)
   sleep(5)
-  unattended_transfer_call(A,B,C)  #still have some issues with this
+  #unattended_transfer_call(A,B,C)  #still have some issues with this
   sleep(5)
   blind_transfer_call(A,B,C)
   sleep(5)
