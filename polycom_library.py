@@ -39,11 +39,14 @@
 ###Requires requests : sudo apt-get install python-requests
 
 import requests
+import inspect
+import sys
 import json
 from requests.auth import HTTPDigestAuth as digest
 from time import sleep
 from subprocess import call as syscall
 import re
+import logging
 
 #Set globals
 USER='Push'
@@ -71,12 +74,28 @@ Call type: Incoming, Outgoing
 !!!!!!TODO!!!!!!     to handle 'None'; positive tests should serve
 """
 
+def getFunctionName():
+  return inspect.stack()[1][3]
+
+def getCallingModuleName():
+  return inspect.stack()[3][3]
+
+def getArguments(frame):
+  args, _, _, values = inspect.getargvalues(frame)
+  return [(i, values[i]) for i in args]
+
+def setLogging(name):
+  log=logging.getLogger(name)
+  requests_log=logging.getLogger("requests").setLevel(logging.WARN)
+  return log
+
 def isHome(ip):
   """
   returns true if phone is on default page (not settings)
   ***STILL NOT REALLY SURE HOW TO DO THIS****
   """
   pass
+
 def goHome(ip):
   """
   Sets phone at IP back to home screen
@@ -88,34 +107,49 @@ def isActive(ip):
   """
   Returns True if line state is Active, else False
   """
+  log=setLogging(__name__)
   state=sendPoll(ip)
-  return["LineState"]=="Active"
+  result=(state["LineState"]=="Active")
+  log.info('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  log.info('%s returned from %s'% (result, (getFunctionName())))
+  return result
 
 def isRingback(ip):
   """
   Returns True if call state is RingBack, else False
   """
   state=sendPoll(ip)
-  return["CallState"]=="RingBack"
+  result=(state["CallState"]=="Ringback")
+  log=setLogging(__name__)
+  log.info('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  log.info('%s returned from %s'% (result, (getFunctionName())))
+  return result
 
 def isRinging(ip):
   """
   Returns True if phone has incoming call, else False
   """
   state=sendPoll(ip)
+  log=setLogging(__name__)
+  log.info('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   try:
-    #print state["CallState"]
-    return state["CallState"]=="Offering"
-  except Exception:
+    result=(state["CallState"]=="Offering")
+    log.info('%s returned from %s'% (result, (getFunctionName())))
+    return result
+  except:
+    log.warn('No headers returned from poll')
     return False
-
 
 def isConnected(ip):
   """
   Returns True if line state is Active, else False
   """
   state=sendPoll(ip)
-  return["CallState"]=="Connected"
+  result=state["CallState"]=="Connected"
+  log=setLogging(__name__)
+  log.info('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  log.info('%s returned from %s'% (result, (getFunctionName())))
+  return result
 
 def call(ip, number):
   """
@@ -130,8 +164,8 @@ def call(ip, number):
   if not isActive(ip):
     #result=sendRequest(PAYLOAD, URL)
     result=sendCurl(PAYLOAD, URL)
-  else:
-    return -1
+  log=setLogging(__name__)
+  log.info('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   
 def connect(ip):
   """
@@ -139,15 +173,11 @@ def connect(ip):
   STATE==OFFERING=>ACTIVE
   """
   callstate=""
-  while callstate!="Offering":
-    try:
-      state=sendPoll(ip)
-      callstate=state["CallState"]
-    except Exception:
-      pass  
   PAYLOAD=(PAYLOAD_A+"Key:Handsfree"+PAYLOAD_B)
   URL=constructPushURL(ip)
   sendCurl(PAYLOAD, URL)
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
 
 def disconnect(ip):
   """
@@ -158,8 +188,14 @@ def disconnect(ip):
   state=sendPoll(ip)
   #Lets not test for connected call, rather test the line
   #Active line state covers all call states 
+
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  state=sendPoll(ip)
+  lineState=state["LineState"]
+  log.debug("Linestate at %s is %s" %(ip, lineState))
   try:
-    if state["LineState"]=="Active":
+    if lineState=="Active":
       PAYLOAD=(PAYLOAD_A+"Key:Softkey2"+PAYLOAD_B)
       URL=constructPushURL(ip)
       sendCurl(PAYLOAD, URL)
@@ -168,14 +204,20 @@ def disconnect(ip):
     PAYLOAD=(PAYLOAD_A+"Key:Softkey2"+PAYLOAD_B)
     URL=constructPushURL(ip)
     sendCurl(PAYLOAD, URL)
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
 
 def transfer(ipA, number, ipC):
   """
   IFF isActive(ipA)?TRUE==>transfer
   From active call, performs attended transfer to number
   """
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   state=sendPoll(ipA)
-  if state["LineState"]=="Active":
+  lineState=state["LineState"]
+  log.debug("Linestate at %s is %s" %(ipA, lineState))
+  if lineState=="Active":
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     URL=constructPushURL(ipA)
     sendCurl(PAYLOAD, URL)
@@ -196,8 +238,12 @@ def unattendedTransfer(ipA, number, ipC):
   IFF isActive(ipA)?TRUE==>transfer
   From active call, performs unattended transfer to number
   """
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   state=sendPoll(ipA)
-  if state["LineState"]=="Active":
+  lineState=state["LineState"]
+  log.debug("Linestate at %s is %s" %(ipA, lineState))
+  if lineState=="Active":
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     URL=constructPushURL(ipA)
     sendCurl(PAYLOAD, URL)
@@ -213,14 +259,20 @@ def unattendedTransfer(ipA, number, ipC):
     #  sleep(1)
     PAYLOAD=(PAYLOAD_A+"Key:Softkey3"+PAYLOAD_B)
     sendCurl(PAYLOAD, URL)
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
 
 def blindTransfer(ipA, number, ipC):
   """
   IFF isActive(ipA)?TRUE==>transfer
   From active call, performs blind transfer to number
   """
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   state=sendPoll(ipA)
-  if state["LineState"]=="Active":
+  lineState=state["LineState"]
+  log.debug("Linestate at %s is %s" %(ipA, lineState))
+  if lineState=="Active":
     URL=constructPushURL(ipA)
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     sendCurl(PAYLOAD, URL)
@@ -241,8 +293,7 @@ def blindTransfer(ipA, number, ipC):
     URL=constructPushURL(ipA)
     PAYLOAD=(PAYLOAD_A+"Key:Softkey3"+PAYLOAD_B)
     sendCurl(PAYLOAD, URL)
-
-
+  
 ###????TODO????###  I think this should stay separate from the initial call; 
 #                   The only downside is I can't check all three phones for conf state
 #                   unless I send in the extra ip, but I can get confirmation from two
@@ -252,8 +303,12 @@ def conference(ipA, number, ipB):
   IFF connected: conference with number
   From active call, conferences with number
   """
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   state=sendPoll(ipA)
-  if state["CallState"]=="Connected":
+  callState=state["CallState"]
+  log.debug("Callstate between %s and %s is %s" %(ipA, number, callState))
+  if callState=="Connected":
     PAYLOAD=(PAYLOAD_A+"Key:Conference"+PAYLOAD_B)
     URL=constructPushURL(ipA)
     sendCurl(PAYLOAD, URL)
@@ -268,18 +323,25 @@ def conference(ipA, number, ipB):
     PAYLOAD=(PAYLOAD_A+"Key:Conference"+PAYLOAD_B)
     URL=constructPushURL(ipA)
     sendCurl(PAYLOAD, URL)
-    
 
+ 
 def constructPushURL(ip):
   """
   Given IP address returns properly constructed push URL
   """ 
-  return (URL_A + ip + URL_B)
+  result=URL_A + ip + URL_B
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  log.debug('%s returned from %s'% (result, (getFunctionName())))  
+  return result
 
 def constructDialPadString(number):
   dialPadString=""
   for n in str(number):
     dialPadString+="Key:Dialpad"+n+"\n"
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  log.debug('%s returned from %s'% (dialPadString, (getFunctionName())))
   return dialPadString
  
 def sendCurl(PAYLOAD, URL):
@@ -288,14 +350,19 @@ def sendCurl(PAYLOAD, URL):
   global PWD
   AUTH=USER+":"+PWD
   curl=['curl', '--digest', '-u', AUTH, '-d', PAYLOAD, '--header', HEADERA , '--header', HEADERB , URL]
-  #print curl
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   return syscall(curl)
 
 def sendRequest(payload, URL):
   global HEADERS
   global AUTH
   DATA=json.dumps(payload)
-  return requests.post(URL, auth=AUTH, verify=False, data=DATA, headers=HEADERS)
+  result=requests.post(URL, auth=AUTH, verify=False, data=DATA, headers=HEADERS)
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  log.debug('%s returned from %s'% (result.status_code, (getFunctionName())))
+  return result
    
 def sendPoll(IP, pollType="callstate"):
   """
@@ -305,28 +372,42 @@ def sendPoll(IP, pollType="callstate"):
   polling/networkHandler
   """
   global AUTH
+  global USER
+  global PWD
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   payload="http://" + IP + "/polling/"+pollType+"Handler"
-  XMLstring= requests.get(payload, auth=AUTH).text.splitlines()
+  result=requests.get(payload, auth=AUTH)
+  if result.status_code!=200:
+    log.warn('%s returned from poll; regenerating Authorization'%(result.status_code,))
+    AUTH=digest(USER, PWD)
+    result=requests.get(payload, auth=AUTH)
+  XMLstring=result.text.splitlines()
   pattern=re.compile(r".*<(.*)>(.*)<.*")
   state={}
   for line in XMLstring:
     m=pattern.match(line)
     if m:
       state.update({m.group(1):m.group(2)})
-  return state    
+
+  lineState=""
+  while lineState not in ['Active', 'Inactive']:
+    try:
+      lineState=state["LineState"]
+    except:
+      log.warn('No headers returned from poll')
+  log.debug('Valid poll response to %s at %s'% ((getFunctionName(), getArguments(inspect.currentframe()))))
+  return state 
+
+
 
 def main():
-  #from 
+  call('10.17.220.217','5551112')
   state=sendPoll("10.17.220.218")
   for  key, value in state.iteritems():
     print '%s : %s' %(key, value)
   
-  #call("10.17.220.217", "5551112")
-  #syscall(['curl', '--digest', '-u', 'Push:Push', '-d', '<PolycomIPPhone><Data priority="Critical">tel:\\5551112</Data></PolycomIPPhone>', '--header', r'Content-Type: application/x-com-polycom-spipx', r'http://10.17.220.217/push'])
-
-  
-
-  
+ 
   
   
 
