@@ -15,10 +15,11 @@ I can push curl commands using supprocess; very kludgy but works which is better
 The methods I use to construct the strings can be used with requests if I ever get it working
 
 
+!!!!!There is XML data that does not show up in the online format embedded in this document.  Click raw to see!!!
+
 Polycom call state:  (The <CallInfo> block is included if and only if <LineState> is ‘Active’. Otherwise it is not included.)
 
-"""
-<CallLineInfo>
+CallLineInfo>
 <LineKeyNum> </LineKeyNum>
 <LineDirNum> </LineDirNum>
 <LineState>Active</LineState>
@@ -63,4 +64,4 @@ Polycom network info:
 <VLANID> </VLANID>
 <DHCPEnabled> </DHCPEnabled>
 </NetworkConfiguration>
-"""
+
