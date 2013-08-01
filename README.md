@@ -17,6 +17,7 @@ The methods I use to construct the strings can be used with requests if I ever g
 
 Polycom call state:  (The <CallInfo> block is included if and only if <LineState> is ‘Active’. Otherwise it is not included.)
 
+"""
 <CallLineInfo>
 <LineKeyNum> </LineKeyNum>
 <LineDirNum> </LineDirNum>
@@ -62,3 +63,4 @@ Polycom network info:
 <VLANID> </VLANID>
 <DHCPEnabled> </DHCPEnabled>
 </NetworkConfiguration>
+"""
