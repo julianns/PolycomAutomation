@@ -1,0 +1,29 @@
+Current	  	Valid
+Offline		supervision
+			detect-battery  		- (this sends you to the IDLE state)
+
+IDLE		detect-battery
+			receive
+			seize
+			supervision
+
+Dialtone	flash					- (sends to Connected state)
+			on-hook 				- (sends back to IDLE state)
+			send-digits				- (sends the digits and state goes to Connecting)
+			
+Connecting	test-path				- (sends to Testing then to Connected)
+
+
+Connected	listen					- (waits for tones and back to Connected)
+			send-digits 			- (sends the digits and back to Connected)
+			send-tones				- (sends the tones/digits and back to Connected)
+			test-path				- (sends to Testing then to Connected)
+			flash <cr>				- (sends flashhook and back to Connected)
+			flash detect-dialtone	- (sends flashhook and goes to Dialtone state)
+			
+Ringing		
+
+Receiving	
+
+Testing		
+		
