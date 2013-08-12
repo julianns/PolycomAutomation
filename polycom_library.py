@@ -84,15 +84,19 @@ def getArguments(frame):
   args, _, _, values = inspect.getargvalues(frame)
   return [(i, values[i]) for i in args]
 
-def setLogging(name):
+
+#!!!!!!!!!!!!!!TODO!!!!!!!!!!! need to be able to set the log level dynamically!!!!!!!!!!!!!!!!!!!!
+def setLogging(name, level=WARN):
   log=logging.getLogger(name)
-  requests_log=logging.getLogger("requests").setLevel(logging.WARN)
+  requests_log=logging.getLogger("requests").setLevel(logging.level)
   return log
 
 def isHome(ip):
   """
   returns true if phone is on default page (not settings)
   ***STILL NOT REALLY SURE HOW TO DO THIS****
+
+  
   """
   pass
 
@@ -100,6 +104,8 @@ def goHome(ip):
   """
   Sets phone at IP back to home screen
   ***STILL NOT REALLY SURE HOW TO DO THIS****
+  
+  !!!if I send an http message and then hit the home button it sends us to home......
   """
   pass
 
@@ -110,8 +116,8 @@ def isActive(ip):
   log=setLogging(__name__)
   state=sendPoll(ip)
   result=(state["LineState"]=="Active")
-  log.info('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  log.info('%s returned from %s'% (result, (getFunctionName())))
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  log.debug('%s returned from %s'% (result, (getFunctionName())))
   return result
 
 def isRingback(ip):
@@ -374,7 +380,7 @@ def sendPoll(IP, pollType="callstate"):
   global AUTH
   global USER
   global PWD
-  log=setLogging(__name__)
+  log=setLogging(__name__, debug)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   payload="http://" + IP + "/polling/"+pollType+"Handler"
   result=requests.get(payload, auth=AUTH)
@@ -383,11 +389,15 @@ def sendPoll(IP, pollType="callstate"):
     AUTH=digest(USER, PWD)
     result=requests.get(payload, auth=AUTH)
   XMLstring=result.text.splitlines()
+  log.debug("Result of poll is %s" %(XMLstring,))
   pattern=re.compile(r".*<(.*)>(.*)<.*")
   state={}
   for line in XMLstring:
+    log.debug("checking %s for XML" %(line))
     m=pattern.match(line)
     if m:
+      log.debug("found match in %s" %(line,))
+      log.debug("Adding key-value pair %s:%s" %(m.group(1),m.group(2)))
       state.update({m.group(1):m.group(2)})
 
   lineState=""
@@ -403,6 +413,7 @@ def sendPoll(IP, pollType="callstate"):
 
 def main():
   call('10.17.220.217','5551112')
+  log.debug("Calling %s at %s" %('5551112','10.17.220.217'))
   state=sendPoll("10.17.220.218")
   for  key, value in state.iteritems():
     print '%s : %s' %(key, value)
