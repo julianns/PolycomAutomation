@@ -374,14 +374,18 @@ def sendPoll(IP, pollType="callstate"):
   global AUTH
   global USER
   global PWD
+  count=0
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  log.info('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   payload="http://" + IP + "/polling/"+pollType+"Handler"
   result=requests.get(payload, auth=AUTH)
-  if result.status_code!=200:
-    log.warn('%s returned from poll; regenerating Authorization'%(result.status_code,))
+  while result.status_code!=200:
+    if count>5:
+      sys.exit()
+    log.warn('%s returned from sendPoll; regenerating Authorization'%(result.status_code,))
     AUTH=digest(USER, PWD)
     result=requests.get(payload, auth=AUTH)
+    count+=1
   XMLstring=result.text.splitlines()
   pattern=re.compile(r".*<(.*)>(.*)<.*")
   state={}
@@ -396,14 +400,14 @@ def sendPoll(IP, pollType="callstate"):
       lineState=state["LineState"]
     except:
       log.warn('No headers returned from poll')
-  log.debug('Valid poll response to %s at %s'% ((getFunctionName(), getArguments(inspect.currentframe()))))
+  log.info('Valid poll response to %s at %s'% ((getFunctionName(), getArguments(inspect.currentframe()))))
   return state 
 
 
 
 def main():
-  call('10.17.220.217','5551112')
-  state=sendPoll("10.17.220.218")
+  call('10.17.220.217','5552112')
+  state=sendPoll("10.17.220.219")
   for  key, value in state.iteritems():
     print '%s : %s' %(key, value)
   

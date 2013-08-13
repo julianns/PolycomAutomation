@@ -93,15 +93,16 @@ def setupLogging():
 
 def main():
   lg=setupLogging()
-  #normal_call(A,B)
+  normal_call(A,C)
   sleep(5)
-  attended_transfer_call(A,B,C)
-  sleep(5)
+  #attended_transfer_call(A,B,C)
+  #sleep(5)
   #unattended_transfer_call(A,B,C)  #still have some issues with this
-  sleep(5)
-  blind_transfer_call(A,B,C)
-  sleep(5)
-  conference_call(A,B,C)
+  #sleep(5)
+  #blind_transfer_call(A,B,C)
+  #sleep(5)
+  #conference_call(A,B,C)
+  
 
 if __name__=="__main__":
   main()
