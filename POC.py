@@ -16,18 +16,22 @@
 ###############################################################################
 
 import logging
+#!!!!!IF I WANT TO DO THIS I SHOULD JUST COMBINE ALL LIBRARIES!!!!!!!!!#
 from polycom_library import *  #allows me to reference library functions without namespace
+from bulk_call_library import *  #allows me to reference library functions without namespace
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#
 
 #just so I can avoid quotes in all my keys
 name="name"
 IP="IP"
 number="number"
+port="port"
 
 #All parameters modified with A, B, or C reference the three possible actors in calling scenarios
 
-A={name:"Maynard Keenan", IP:"10.17.220.217", number:"5551111"}
-B={name:"Roger Daltry", IP:"10.17.220.218", number:"5551112"}
-C={name:"Getty Lee", IP:"10.17.220.219", number:"5552112"}
+A={name:"Maynard Keenan", IP:"10.17.220.217", number:"5551111", port:"0/1"}
+B={name:"Roger Daltry", IP:"10.17.220.218", number:"5551112", port:"0/2"}
+C={name:"Getty Lee", IP:"10.17.220.219", number:"5552112", port:"0/3"}
 
 def normal_call(A, B):
   result=call(A[IP], B[number])
