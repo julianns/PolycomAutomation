@@ -86,9 +86,9 @@ def getArguments(frame):
 
 
 #!!!!!!!!!!!!!!TODO!!!!!!!!!!! need to be able to set the log level dynamically!!!!!!!!!!!!!!!!!!!!
-def setLogging(name, level=WARN):
+def setLogging(name):
   log=logging.getLogger(name)
-  requests_log=logging.getLogger("requests").setLevel(logging.level)
+  #requests_log=logging.getLogger("requests").setLevel(logging.level)
   return log
 
 def isHome(ip):
@@ -376,6 +376,7 @@ def sendPoll(IP, pollType="callstate"):
   polling/callStateHandler
   polling/deviceHandler
   polling/networkHandler
+
   """
   global AUTH
   global USER
