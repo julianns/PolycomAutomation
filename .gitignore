@@ -6,6 +6,9 @@
 # phone configs
 .cfg
 
+#logs
+*.log
+
 # Packages
 *.egg
 *.egg-info
