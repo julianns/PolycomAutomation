@@ -3,6 +3,9 @@
 # C extensions
 *.so
 
+# phone configs
+.cfg
+
 # Packages
 *.egg
 *.egg-info
