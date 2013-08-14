@@ -16,6 +16,7 @@
 ###############################################################################
 
 import logging
+import timing
 #!!!!!IF I WANT TO DO THIS I SHOULD JUST COMBINE ALL LIBRARIES!!!!!!!!!#
 from polycom_library import *  #allows me to reference library functions without namespace
 from bulk_call_library import *  #allows me to reference library functions without namespace
@@ -108,17 +109,25 @@ def main():
   #conference_call(A,B,C)
   con=connect("10.17.220.7")
   prompt=login(con)
-  initializeSIP(con, '0/1')
-  initializeSIP(con, '0/3')
-  listenForTones(con, '0/3', '60000', '2')
-  time.sleep(1)
-  tones='12'
-  sendKeyPress('10.17.220.217', tones)
-  result=con.expect(['0x5000', '0x5001'], 20)
-  if str(result[0])==1:
-    print 'Success!'
-  else:
-    print result[2]
+  count=0.0
+  success=0.0
+  failed=0
+  while count<5000:
+    count +=1
+    initializeSIP(con, '0/1')
+    initializeSIP(con, '0/3')
+    listenForTones(con, '0/3')
+    time.sleep(2)
+    tones='45'
+    sendKeyPress('10.17.220.217', tones)
+    result=con.expect([tones,], 20)
+    if result[0]!=-1:
+      success+=1
+    else:
+      failed+=1
+
+  
+  print '\n\n%d out of %d success' %(success,count)
   
   
 
