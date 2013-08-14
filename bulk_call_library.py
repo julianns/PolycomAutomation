@@ -195,16 +195,14 @@ def initializeSIP(con, port):
     con.write(cmd)
     con.expect(['Connected'], 2)
 
-def listenForTones(con, port, time='20000', tones='4'):
+def listenForTones(con, port, time='60000', tones='4'):
     """
     Takes a port in Connected State and
     listens for $time MS for $tones tones
     """
-    cmd="script-manager fxo %s listen %s %s" % (port, time, tones)
+    cmd="script-manager fxo %s listen %s %s\n" % (port, time, tones)
     con.write(cmd)
-    print cmd
-    con.expect(['#'], 2)
-    
+  
     
 
 def main():

@@ -110,9 +110,16 @@ def main():
   prompt=login(con)
   initializeSIP(con, '0/1')
   initializeSIP(con, '0/3')
-  listenForTones(con, '0/3')
-  print "sending"
-  sendKeyPress('10.17.220.217', '1234')
+  listenForTones(con, '0/3', '60000', '2')
+  time.sleep(1)
+  tones='12'
+  sendKeyPress('10.17.220.217', tones)
+  result=con.expect(['0x5000', '0x5001'], 20)
+  if str(result[0])==1:
+    print 'Success!'
+  else:
+    print result[2]
+  
   
 
 if __name__=="__main__":
