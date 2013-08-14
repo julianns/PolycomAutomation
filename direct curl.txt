@@ -1,0 +1,1 @@
+['curl', '--digest', '-u', 'Push:Push', '-d', '<PolycomIPPhone><Data priority="Critical">tel:\\5551112</Data></PolycomIPPhone>', '--header', r'Content-Type: application/x-com-polycom-spipx', r'http://10.17.220.217/push']
