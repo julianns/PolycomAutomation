@@ -147,7 +147,7 @@ def callStart(con, portA, portB, number):
     con.expect(['Connecting'], 2)
 def confirmPath(con, portA, portB):
     """
-    !!!!Assumes portB is ringing!!!
+    !!!!Assumes any actual phones are in headset mode!!!
     Confirms talk path from A->B
     by setting B to listen and then sending
     tones from A->B and confirming receipt
@@ -172,14 +172,50 @@ def confirmPath(con, portA, portB):
     con.write(cmd)
     con.expect(['123456'], 2)
     result=""
+def initializeSIP(con, port):
+    """
+    Initiallizes a port connected to the
+    headset on a polycom phone which is
+    affilliated with an existing call and
+    leaves it in connected mode
+    """
+    baseCommand="script-manager fxo %s " % (port,)
+    # results in Idle state
+    cmd=baseCommand + on
+    con.write(cmd)
+    con.expect(['Idle'], 2)
+    time.sleep(1)
+    #results in Dialtone state
+    cmd=baseCommand + seize
+    con.write(cmd)
+    con.expect(['Dialtone'], 2)
+    time.sleep(1)
+    #results in Connected state
+    cmd=baseCommand + flash
+    con.write(cmd)
+    con.expect(['Connected'], 2)
+
+def listenForTones(con, port, time='20000', tones='4'):
+    """
+    Takes a port in Connected State and
+    listens for $time MS for $tones tones
+    """
+    cmd="script-manager fxo %s listen %s %s" % (port, time, tones)
+    con.write(cmd)
+    print cmd
+    con.expect(['#'], 2)
+    
+    
+
 def main():
-    portA='0/7'
-    portB='0/3'
+    #portA='0/7'
+    #portB='0/2'
     con=connect("10.17.220.7")
     prompt=login(con)
-    callStart(con, portA, portB, '5552112')
-    time.sleep(10)
+    #callStart(con, portA, portB, '5551112')
+    #time.sleep(10)
     #confirmPath(con, portA, portB)
+    initializeSIP(con, '0/1')
 
 if __name__ == '__main__':
 	main()

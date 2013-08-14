@@ -97,8 +97,8 @@ def setupLogging():
 
 def main():
   lg=setupLogging()
-  normal_call(A,C)
-  sleep(5)
+  #normal_call(A,C)
+  #sleep(5)
   #attended_transfer_call(A,B,C)
   #sleep(5)
   #unattended_transfer_call(A,B,C)  #still have some issues with this
@@ -106,6 +106,13 @@ def main():
   #blind_transfer_call(A,B,C)
   #sleep(5)
   #conference_call(A,B,C)
+  con=connect("10.17.220.7")
+  prompt=login(con)
+  initializeSIP(con, '0/1')
+  initializeSIP(con, '0/3')
+  listenForTones(con, '0/3')
+  print "sending"
+  sendKeyPress('10.17.220.217', '1234')
   
 
 if __name__=="__main__":
