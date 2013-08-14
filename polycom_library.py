@@ -414,14 +414,20 @@ def sendPoll(IP, pollType="callstate"):
   log.info('Valid poll response to %s at %s'% ((getFunctionName(), getArguments(inspect.currentframe()))))
   return state 
 
+def sendKeyPress(ip, number):
+  payload=PAYLOAD_A+constructDialPadString(number)+PAYLOAD_B
+  url=constructPushURL(ip)
+  sendCurl(payload, url)
+  
+
 
 
 def main():
-  call('10.17.220.217','5552112')
-  state=sendPoll("10.17.220.219")
-  for  key, value in state.iteritems():
-    print '%s : %s' %(key, value)
-  
+  #call('10.17.220.217','5552112')
+  #state=sendPoll("10.17.220.219")
+  #for  key, value in state.iteritems():
+    #print '%s : %s' %(key, value)
+  sendKeyPress('10.17.220.217', '123456')
  
   
   
