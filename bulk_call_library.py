@@ -155,25 +155,31 @@ def confirmPath(con, portA, portB):
     """
     baseA="script-manager fxo %s " % (portA,)
     baseB="script-manager fxo %s " % (portB,)
+    #results in Dialtone portB
+    cmd=baseB + seize
+    con.write(cmd)
+    con.expect(['#'], 2)
     #results in Connected portB
     cmd=baseB + flash
     con.write(cmd)
     con.expect(['Connected'], 2)
     #results in Connected portB
     cmd=baseB + listen6
+    print "Sending tones"
     con.write(cmd)
     con.expect(['#'], 2)
     cmd=baseA + send
     con.write(cmd)
-    con.expect([''], 2)
+    con.expect(['123456'], 2)
     result=""
 def main():
     portA='0/7'
-    portB='0/1'
+    portB='0/3'
     con=connect("10.17.220.7")
     prompt=login(con)
-    callStart(con, portA, portB, '5551111')
-    confirmPath(con, portA, portB)
+    callStart(con, portA, portB, '5552112')
+    time.sleep(10)
+    #confirmPath(con, portA, portB)
 
 if __name__ == '__main__':
 	main()
