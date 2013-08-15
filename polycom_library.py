@@ -127,8 +127,8 @@ def isRingback(ip):
   state=sendPoll(ip)
   result=(state["CallState"]=="Ringback")
   log=setLogging(__name__)
-  log.info('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  log.info('%s returned from %s'% (result, (getFunctionName())))
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  log.debug('%s returned from %s'% (result, (getFunctionName())))
   return result
 
 def isRinging(ip):
@@ -137,10 +137,10 @@ def isRinging(ip):
   """
   state=sendPoll(ip)
   log=setLogging(__name__)
-  log.info('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   try:
     result=(state["CallState"]=="Offering")
-    log.info('%s returned from %s'% (result, (getFunctionName())))
+    log.debug('%s returned from %s'% (result, (getFunctionName())))
     return result
   except:
     log.warn('No headers returned from poll')
@@ -150,28 +150,36 @@ def isConnected(ip):
   """
   Returns True if line state is Active, else False
   """
-  state=sendPoll(ip)
-  result=state["CallState"]=="Connected"
   log=setLogging(__name__)
-  log.info('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  log.info('%s returned from %s'% (result, (getFunctionName())))
-  return result
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  state=sendPoll(ip)
+  try:
+    result=state["CallState"]=="Connected"
+    log.debug('%s returned from %s'% (result, (getFunctionName())))
+    return result
+  except Exception:
+    log.error(Exception)
+    return False
 
 def call(ip, number):
   """
   IFF LineState?INACTIVE==>DIALTONE->SETUP->RINGBACK
   Given the ip address of the phone from which to call and a number to call
-  calls number
+  calls number, and goes to headset mode
   TODO:  Returns -1 if no registered line is inactive or if push message rejected 
   """
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   URL=constructPushURL(ip)
   #command="Key:Softkey1\n"+constructDialPadString(number)+"Key:Softkey2"
   PAYLOAD=(PAYLOAD_A + "tel:\\"+number+ PAYLOAD_B)
   if not isActive(ip):
     #result=sendRequest(PAYLOAD, URL)
     result=sendCurl(PAYLOAD, URL)
-  log=setLogging(__name__)
-  log.info('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  PAYLOAD=(PAYLOAD_A+"Key:Headset"+PAYLOAD_B)
+  sendCurl(PAYLOAD, URL)
+  sleep(2)
+
   
 def connect(ip):
   """
@@ -179,8 +187,9 @@ def connect(ip):
   STATE==OFFERING=>ACTIVE
   """
   callstate=""
-  PAYLOAD=(PAYLOAD_A+"Key:Handsfree"+PAYLOAD_B)
+  PAYLOAD=(PAYLOAD_A+"Key:Headset"+PAYLOAD_B)
   URL=constructPushURL(ip)
+  print "connecting to %s"%ip
   sendCurl(PAYLOAD, URL)
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
@@ -383,7 +392,7 @@ def sendPoll(IP, pollType="callstate"):
   global PWD
   count=0
   log=setLogging(__name__)
-  log.info('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   payload="http://" + IP + "/polling/"+pollType+"Handler"
   result=requests.get(payload, auth=AUTH)
   while result.status_code!=200:
@@ -411,7 +420,7 @@ def sendPoll(IP, pollType="callstate"):
       lineState=state["LineState"]
     except:
       log.warn('No headers returned from poll')
-  log.info('Valid poll response to %s at %s'% ((getFunctionName(), getArguments(inspect.currentframe()))))
+  log.debug('Valid poll response to %s at %s'% ((getFunctionName(), getArguments(inspect.currentframe()))))
   return state 
 
 def sendKeyPress(ip, number):
@@ -422,12 +431,14 @@ def sendKeyPress(ip, number):
 
 
 
-def main():
+def test():
   #call('10.17.220.217','5552112')
   #state=sendPoll("10.17.220.219")
   #for  key, value in state.iteritems():
     #print '%s : %s' %(key, value)
-  sendKeyPress('10.17.220.217', '123456')
+  connect('10.17.220.218')
+  sleep(1)
+  print isConnected('10.17.220.218')
  
   
   
@@ -437,5 +448,5 @@ def main():
 
 
 if __name__=="__main__":
-  main()
+  test()
 

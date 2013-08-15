@@ -59,7 +59,7 @@ send=" send-tones 123456\n"
 sls=" supervision loop-start\n"    
 
 #takes an IP address (string) as argument, returns Telnet object
-def connect(address):
+def telnet(address):
     try:
         con = telnetlib.Telnet(address,23,10)
         return con
@@ -195,7 +195,7 @@ def initializeSIP(con, port):
     con.write(cmd)
     con.expect(['Connected'], 2)
 
-def listenForTones(con, port, time='60000', tones='2'):
+def listenForTones(con, port, time='15000', tones='2'):
     """
     Takes a port in Connected State and
     listens for $time MS for $tones tones
@@ -205,10 +205,10 @@ def listenForTones(con, port, time='60000', tones='2'):
   
     
 
-def main():
+def test():
     #portA='0/7'
     #portB='0/2'
-    con=connect("10.17.220.7")
+    con=telnet("10.17.220.7")
     prompt=login(con)
     #callStart(con, portA, portB, '5551112')
     #time.sleep(10)
@@ -216,6 +216,6 @@ def main():
     initializeSIP(con, '0/1')
 
 if __name__ == '__main__':
-	main()
+    test()
 
 
