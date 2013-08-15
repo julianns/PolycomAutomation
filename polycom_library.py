@@ -198,27 +198,18 @@ def disconnect(ip):
   """
   IFF isConnected(ip)?TRUE==>isActive(ip)?FALSE
   STATE==CONNECTED=>INACTIVE
-  ???Can we reliably use the HandsFree key if we use it to answer the phone initially???
   """
   state=sendPoll(ip)
-  #Lets not test for connected call, rather test the line
-  #Active line state covers all call states 
-
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   state=sendPoll(ip)
-  lineState=state["LineState"]
-  log.debug("Linestate at %s is %s" %(ip, lineState))
   try:
-    if lineState=="Active":
+    if callState=="Connected":
       PAYLOAD=(PAYLOAD_A+"Key:Softkey2"+PAYLOAD_B)
       URL=constructPushURL(ip)
       sendCurl(PAYLOAD, URL)
   except Exception:
-    
-    PAYLOAD=(PAYLOAD_A+"Key:Softkey2"+PAYLOAD_B)
-    URL=constructPushURL(ip)
-    sendCurl(PAYLOAD, URL)
+    pass
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
 
@@ -428,6 +419,13 @@ def sendKeyPress(ip, number):
   url=constructPushURL(ip)
   sendCurl(payload, url)
   
+def maxVolume(ip):
+  for i in range(5):
+    payload=(PAYLOAD_A+"Key:VolUp"+PAYLOAD_B)
+    url=constructPushURL(ip)
+    sendCurl(payload, url)
+  
+
 
 
 

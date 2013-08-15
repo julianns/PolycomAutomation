@@ -44,17 +44,18 @@ def verifyTalkPath(A, B, con):
   failed=0
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  initializeSIP(con, A[port])
+  initializeSIP(con, B[port])
   while count<2.0:
     count +=1
     time.sleep(6)
-    initializeSIP(con, A[port])
-    initializeSIP(con, B[port])
     listenForTones(con, B[port])
     time.sleep(2)
-    tones='45'
+    tones='99999'
     sendKeyPress(A[IP], tones)
-    result=con.expect([tones,], 20)
-    if result[0]!=-1:
+    result=con.expect(["0x5000", "0x5001"], 15)
+    log.debug("count %f result is %s"%(count,result))
+    if result[0]!=0:
       success+=1
     else:
       log.error("Error verifying talk path from %s to %s" %(A[name], B[name])) 
@@ -62,34 +63,39 @@ def verifyTalkPath(A, B, con):
 
 
 def normal_call(A, B, con):
+  """
+  places call between A and B,
+  verifies talk path in both directions,
+  logs results and hangs up
+  """
+  log=setLogging(__name__)
+  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   call(A[IP], B[number])
-  print "ringing = %s" %( isRinging(B[IP]),)
+  log.info('Normal call test initiated between %s and %s' %(A[name], B[name]))
   while not isRinging(B[IP]):
-    print "ringing= %s" %( isRinging(B[IP]),)
     sleep(1)
   connect(B[IP])
   sleep(2)
   agood=isConnected(A[IP])
   bgood=isConnected(B[IP])
-  print "It is %s that A is connected"%agood
-  print "It is %s that B is connected"%bgood
-  connected=agood+bgood
-  print "Connected = %s"%(connected,)
-  log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  if connected:
+  log.debug("It is %s that A is connected"%agood)
+  log.debug("It is %s that B is connected"%bgood)
+  if agood and bgood:
+    #crank up the headset volumes
+    maxVolume(A[IP])
+    maxVolume(B[IP])
     log.info('%s connected to %s'% (A[name], B[name]))
   else:
     log.error('error connecting %s to %s'% (A[name], B[name]))
-  log.debug('initiating talk path verification from %s to %s'% (A[name], B[name]))
-  successRate=verifyTalkPath(A,B,con)
-  log.info('%s success rate from %s to %s in normal call'%(successRate,A[name], B[name]))  
-  log.debug('initiating talk path verification from %s to %s'% (B[name], A[name]))
-  successRate=verifyTalkPath(B,A,con)
-  log.info('%s success rate from %s to %s in normal call'%(successRate,B[name], A[name]))
-  print "disconnecting"
+  #seize associated ports and get them into Connected state
+  log.info('initiating talk path verification from %s to %s'% (A[name], B[name]))
+  successAB=verifyTalkPath(A,B,con)
+  log.info('%s success rate from %s to %s in normal call'%(successAB,A[name], B[name]))  
+  log.info('initiating talk path verification from %s to %s'% (B[name], A[name]))
+  successBA=verifyTalkPath(B,A,con)
+  log.info('%s success rate from %s to %s in normal call'%(successBA,B[name], A[name]))
+  log.info('Normal call test complete')  
   disconnect(A[IP])
-  disconnect(B[IP])
   
 def conference_call(A,B,C):
   call(A[IP], B[number])
@@ -100,8 +106,6 @@ def conference_call(A,B,C):
   conference(A[IP], C[number], C[IP])
   sleep(5)
   disconnect(A[IP])
-  disconnect(B[IP])
-  disconnect(C[IP])
   
 def attended_transfer_call(A,B,C):
   call(A[IP], B[number])
@@ -111,7 +115,7 @@ def attended_transfer_call(A,B,C):
   transfer(A[IP], C[number], C[IP])
   sleep(5)
   disconnect(B[IP])
-  disconnect(C[IP])
+  
  
 def unattended_transfer_call(A,B,C):
   call(A[IP], B[number])
@@ -121,7 +125,7 @@ def unattended_transfer_call(A,B,C):
   unattendedTransfer(A[IP], C[number], C[IP])
   sleep(5)
   disconnect(B[IP])
-  disconnect(C[IP])
+  
 
 def blind_transfer_call(A,B,C):
   call(A[IP], B[number])
@@ -131,7 +135,7 @@ def blind_transfer_call(A,B,C):
   blindTransfer(A[IP], C[number], C[IP])
   sleep(5)
   disconnect(B[IP])
-  disconnect(C[IP])
+  
 
 def setupLogging():
   #setup basic logging configuration for INFO
@@ -162,6 +166,10 @@ def test():
   """
   con=initiallize(BULK_CALLER)
   normal_call(A,B,con)
+  #normal_call(A,C,con)
+  #normal_call(B,C,con)
+  
+
 
   
   
