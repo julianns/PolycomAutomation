@@ -199,12 +199,11 @@ def disconnect(ip):
   IFF isConnected(ip)?TRUE==>isActive(ip)?FALSE
   STATE==CONNECTED=>INACTIVE
   """
-  state=sendPoll(ip)
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   state=sendPoll(ip)
   try:
-    if callState=="Connected":
+    if state['CallState']=="Connected":
       PAYLOAD=(PAYLOAD_A+"Key:Softkey2"+PAYLOAD_B)
       URL=constructPushURL(ip)
       sendCurl(PAYLOAD, URL)
@@ -389,7 +388,7 @@ def sendPoll(IP, pollType="callstate"):
   while result.status_code!=200:
     if count>5:
       sys.exit()
-    log.warn('%s returned from sendPoll; regenerating Authorization'%(result.status_code,))
+    log.debug('%s returned from sendPoll; regenerating Authorization'%(result.status_code,))
     AUTH=digest(USER, PWD)
     result=requests.get(payload, auth=AUTH)
     count+=1
@@ -420,7 +419,7 @@ def sendKeyPress(ip, number):
   sendCurl(payload, url)
   
 def maxVolume(ip):
-  for i in range(5):
+  for i in range(10):
     payload=(PAYLOAD_A+"Key:VolUp"+PAYLOAD_B)
     url=constructPushURL(ip)
     sendCurl(payload, url)

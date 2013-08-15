@@ -46,12 +46,12 @@ def verifyTalkPath(A, B, con):
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   initializeSIP(con, A[port])
   initializeSIP(con, B[port])
-  while count<2.0:
+  while count<5.0:
     count +=1
     time.sleep(6)
     listenForTones(con, B[port])
     time.sleep(2)
-    tones='99999'
+    tones='23'
     sendKeyPress(A[IP], tones)
     result=con.expect(["0x5000", "0x5001"], 15)
     log.debug("count %f result is %s"%(count,result))
@@ -165,9 +165,10 @@ def test():
   Unit testing of automation script
   """
   con=initiallize(BULK_CALLER)
+  #disconnect(A[IP])
   normal_call(A,B,con)
-  #normal_call(A,C,con)
-  #normal_call(B,C,con)
+  normal_call(A,C,con)
+  normal_call(B,C,con)
   
 
 
