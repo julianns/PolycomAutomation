@@ -72,10 +72,12 @@ import requests
 import sys
 import telnetlib
 import time
+import timing
 from requests.auth import HTTPDigestAuth as digest
 from subprocess import call as syscall
 from sys import exit
 from time import sleep
+
 
 #Set globals
 username, password, enable = 'adtran\n', 'adtran\n', 'adtran\n'
@@ -178,19 +180,16 @@ def isConnected(A):
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   state=sendPoll(A)
   try:
-    result=state["CallState"]=="Connected"
+    result=(state["CallState"]=="Connected" or state["CallState"]=="CallConference")
     log.debug('%s returned from %s'% (result, (getFunctionName())))
     return result
   except Exception:
     log.error(Exception)
     return False
 
-def call(A, B, hs=False):
+def call(A, B, inHeadsetMode):
   """
-  IFF LineState?INACTIVE==>DIALTONE->SETUP->RINGBACK
-  Given the ip address of the phone from which to call and a number to call
-  calls number, and goes to headset mode
-  TODO:  Returns -1 if no registered line is inactive or if push message rejected 
+  A calls B and if A is not in headeset mode, goes to headset mode
   """
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
@@ -200,20 +199,18 @@ def call(A, B, hs=False):
   if not isActive(A):
     #result=sendRequest(PAYLOAD, URL)
     result=sendCurl(PAYLOAD, URL)
-  if hs:
+  if not inHeadsetMode:
     PAYLOAD=(PAYLOAD_A+"Key:Headset"+PAYLOAD_B)
     sendCurl(PAYLOAD, URL)
-  sleep(2)
+  sleep(1)
   
 def connect(A):
   """
   IFF isRinging(ip)?TRUE==>isActive(ip)
   STATE==OFFERING=>ACTIVE
   """
-  callstate=""
-  PAYLOAD=(PAYLOAD_A+"Key:Headset"+PAYLOAD_B)
   URL=constructPushURL(A)
-  print "connecting to %s"%(A[IP],)
+  PAYLOAD=(PAYLOAD_A+"Key:Headset"+PAYLOAD_B)
   sendCurl(PAYLOAD, URL)
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
@@ -246,7 +243,7 @@ def attendedTransfer(A,C, con):
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     URL=constructPushURL(A)
     sendCurl(PAYLOAD, URL)
-    call(A,C)
+    call(A,C, True)
     while not isRinging(C):
       sleep(1)
     connect(C)
@@ -256,7 +253,7 @@ def attendedTransfer(A,C, con):
     URL=constructPushURL(A)
     sendCurl(PAYLOAD, URL)    
     disconnect(A)
-    
+
 def unattendedTransfer(A, C):
   """
   From connected call (A-B), performs unattended transfer resulting in (B-C)
@@ -267,18 +264,14 @@ def unattendedTransfer(A, C):
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     URL=constructPushURL(A)
     sendCurl(PAYLOAD, URL)
-    call(A, C)
+    call(A, C, True)
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     URL=constructPushURL(A)
     sendCurl(PAYLOAD, URL)
-    disconnect(A)
     while not isRinging(C):
       sleep(1)
+    sleep(1)
     connect(C)
-    PAYLOAD=(PAYLOAD_A+"Key:Softkey3"+PAYLOAD_B)
-    sendCurl(PAYLOAD, URL)
-  log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
 
 def blindTransfer(A, C):
   """
@@ -290,42 +283,11 @@ def blindTransfer(A, C):
     URL=constructPushURL(A)
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     sendCurl(PAYLOAD, URL)
-    sleep(3)
-    PAYLOAD=(PAYLOAD_A+"Key:Softkey4"+PAYLOAD_B)
-    sendCurl(PAYLOAD, URL)
-    PAYLOAD=(PAYLOAD_A+"Key:Softkey1"+PAYLOAD_B)
-    sendCurl(PAYLOAD, URL)
-    call(A, C)
-    sleep(1)
-    disconnect(A)
-    sleep(1)
-    connect(C)
     URL=constructPushURL(A)
     PAYLOAD=(PAYLOAD_A+"Key:Softkey3"+PAYLOAD_B)
     sendCurl(PAYLOAD, URL)
-  
-def conference(A, B):
-  """
-  From connected call (A-B), performs conference resulting in (A-B-C)
-  """
-  log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  if isConnected:
-    PAYLOAD=(PAYLOAD_A+"Key:Conference"+PAYLOAD_B)
-    URL=constructPushURL(A)
-    sendCurl(PAYLOAD, URL)
-    call(A, B[number])
-    sleep(3)
-    while not isRinging(B):
-      sleep(1)
-    connect(B)
-    #while not isConnected(B[IP]):
-    #  sleep(1)
-    sleep(3)
-    PAYLOAD=(PAYLOAD_A+"Key:Conference"+PAYLOAD_B)
-    URL=constructPushURL(A)
-    sendCurl(PAYLOAD, URL)
- 
+    initializeCall(A, C, 'blind transfer BC', log, True)
+
 def constructPushURL(A):
   """
   Given IP address returns properly constructed push URL
@@ -436,179 +398,195 @@ def pressConference(A):
     sendCurl(PAYLOAD, URL)
 
 def telnet(address):
-    try:
-        con = telnetlib.Telnet(address,23,10)
-        return con
-    except:
-        print "Error connecting to %s:" %(address)
-        print sys.exc_info()[0]
-        return -1
+  log=setLogging(__name__)
+  try:
+    con = telnetlib.Telnet(address,23,10)
+    return con
+  except:
+    log.error( "Error connecting to %s:" %(address))
+    log.error(sys.exc_info()[0])
+    return -1
 
 def login(con):
-    global username
-    global password
-    global enable
-    
-    temp=con.expect(['Username:'], 2)
-    if temp[0] == -1:
-        print temp
-        exit()
-    con.write(username)
-    temp=con.expect(['Password:'], 2)
-    if temp[0] == -1:
-        print temp
-        exit()
-    con.write(password)
-    con.expect(['>'], 2)
-    if temp[0] == -1:
-        print temp
-        exit()
-    con.write("en\n")
-    con.expect(['Password:'], 2)
-    if temp[0] == -1:
-        print temp
-        exit()
-    con.write(enable)
-    con.expect(['#'], 2)
-    if temp[0] == -1:
-        print temp
-        exit()
-    con.write('\n')
-    prompt=con.read_until('#')
-    con.write("terminal length 0\n")
-    if temp[0] == -1:
-        print temp
-        exit()
-    con.expect([prompt])
-    return prompt
+  global username
+  global password
+  global enable
+  
+  temp=con.expect(['Username:'], 2)
+  if temp[0] == -1:
+      print temp
+      exit()
+  con.write(username)
+  temp=con.expect(['Password:'], 2)
+  if temp[0] == -1:
+      print temp
+      exit()
+  con.write(password)
+  con.expect(['>'], 2)
+  if temp[0] == -1:
+      print temp
+      exit()
+  con.write("en\n")
+  con.expect(['Password:'], 2)
+  if temp[0] == -1:
+      print temp
+      exit()
+  con.write(enable)
+  con.expect(['#'], 2)
+  if temp[0] == -1:
+      print temp
+      exit()
+  con.write('\n')
+  prompt=con.read_until('#')
+  con.write("terminal length 0\n")
+  if temp[0] == -1:
+      print temp
+      exit()
+  con.expect([prompt])
+  return prompt
 
 def initialize(con, port):
-    """
-    Takes connection and FXO port number (string)
-    as arguments and sets the given port into Idle state
-    """
-    baseCommand="script-manager fxo %s " % (port,)
-    # results in Offline state
-    cmd=baseCommand + on
-    con.write(cmd)
-    con.expect([''], 2)
-    # results in Idle state
-    cmd=baseCommand + db
-    con.write(cmd)
-    con.expect(['to Idle'], 2)
+  """
+  Takes connection and FXO port number (string)
+  as arguments and sets the given port into Idle state
+  """
+  baseCommand="script-manager fxo %s " % (port,)
+  # results in Offline state
+  cmd=baseCommand + on
+  con.write(cmd)
+  con.expect([''], 2)
+  # results in Idle state
+  cmd=baseCommand + db
+  con.write(cmd)
+  con.expect(['to Idle'], 2)
 
 def callStart(con, portA, portB, number):
-    """
-    Initiates call between A-B
-    """
-    #puts ports into Idle state
-    initialize(con, portA)
-    initialize(con, portB)
-    baseA="script-manager fxo %s " % (portA,)
-    baseB="script-manager fxo %s " % (portB,)
-    # does not change state of portA
-    cmd=baseA + sls
-    con.write(cmd)
-    con.expect(['#'], 2)
-    # does not change state portB
-    cmd=baseB + sls
-    con.write(cmd)
-    con.expect(['#'], 2)
-    #results in Dialtone portA
-    cmd=baseA + seize
-    con.write(cmd)
-    con.expect(['Dialtone'], 2)
-    #results in Connecting portA, portB ringing
-    print "calling %s" %(number,)
-    cmd=baseA + dial + " " + number +"\n"
-    con.write(cmd)
-    con.expect(['Connecting'], 2)
+  """
+  Initiates call between A-B
+  """
+  #puts ports into Idle state
+  initialize(con, portA)
+  initialize(con, portB)
+  baseA="script-manager fxo %s " % (portA,)
+  baseB="script-manager fxo %s " % (portB,)
+  # does not change state of portA
+  cmd=baseA + sls
+  con.write(cmd)
+  con.expect(['#'], 2)
+  # does not change state portB
+  cmd=baseB + sls
+  con.write(cmd)
+  con.expect(['#'], 2)
+  #results in Dialtone portA
+  cmd=baseA + seize
+  con.write(cmd)
+  con.expect(['Dialtone'], 2)
+  #results in Connecting portA, portB ringing
+  print "calling %s" %(number,)
+  cmd=baseA + dial + " " + number +"\n"
+  con.write(cmd)
+  con.expect(['Connecting'], 2)
 
 def confirmPath(con, portA, portB):
-    """
-    !!!!Assumes any actual phones are in headset mode!!!
-    Confirms talk path from A->B
-    by setting B to listen and then sending
-    tones from A->B and confirming receipt
-    and decodability
-    """
-    baseA="script-manager fxo %s " % (portA,)
-    baseB="script-manager fxo %s " % (portB,)
-    #results in Dialtone portB
-    cmd=baseB + seize
-    con.write(cmd)
-    con.expect(['#'], 2)
-    #results in Connected portB
-    cmd=baseB + flash
-    con.write(cmd)
-    con.expect(['Connected'], 2)
-    #results in Connected portB
-    cmd=baseB + listen6
-    print "Sending tones"
-    con.write(cmd)
-    con.expect(['#'], 2)
-    cmd=baseA + send
-    con.write(cmd)
-    con.expect(['123456'], 2)
-    result=""
+  """
+  !!!!Assumes any actual phones are in headset mode!!!
+  Confirms talk path from A->B
+  by setting B to listen and then sending
+  tones from A->B and confirming receipt
+  and decodability
+  """
+  baseA="script-manager fxo %s " % (portA,)
+  baseB="script-manager fxo %s " % (portB,)
+  #results in Dialtone portB
+  cmd=baseB + seize
+  con.write(cmd)
+  con.expect(['#'], 2)
+  #results in Connected portB
+  cmd=baseB + flash
+  con.write(cmd)
+  con.expect(['Connected'], 2)
+  #results in Connected portB
+  cmd=baseB + listen6
+  print "Sending tones"
+  con.write(cmd)
+  con.expect(['#'], 2)
+  cmd=baseA + send
+  con.write(cmd)
+  con.expect(['123456'], 2)
+  result=""
 
 def initializeSIP(con, port):
-    """
-    Initiallizes a port connected to the
-    headset on a polycom phone which is
-    affilliated with an existing call and
-    leaves it in connected mode
-    """
-    baseCommand="script-manager fxo %s " % (port,)
-    # results in Idle state
-    cmd=baseCommand + on
-    con.write(cmd)
-    con.expect(['Idle'], 2)
-    time.sleep(1)
-    #results in Dialtone state
-    cmd=baseCommand + seize
-    con.write(cmd)
-    con.expect(['Dialtone'], 2)
-    time.sleep(1)
-    #results in Connected state
-    cmd=baseCommand + flash
-    con.write(cmd)
-    con.expect(['Connected'], 2)
+  """
+  Initiallizes a port connected to the
+  headset on a polycom phone which is
+  affilliated with an existing call and
+  leaves it in connected mode
+  """
+  baseCommand="script-manager fxo %s " % (port,)
+  # results in Idle state
+  cmd=baseCommand + on
+  con.write(cmd)
+  con.expect(['Idle'], 2)
+  time.sleep(1)
+  #results in Dialtone state
+  cmd=baseCommand + seize
+  con.write(cmd)
+  con.expect(['Dialtone'], 2)
+  time.sleep(1)
+  #results in Connected state
+  cmd=baseCommand + flash
+  con.write(cmd)
+  con.expect(['Connected'], 2)
 
 def listenForTones(con, port, time='18000', tones='1'):
-    """
-    Takes a port in Connected State and
-    listens for $time MS for $tones tones
-    """
-    cmd="script-manager fxo %s listen %s %s\n" % (port, time, tones)
-    con.write(cmd)
+  """
+  Takes a port in Connected State and
+  listens for $time MS for $tones tones
+  """
+  cmd="script-manager fxo %s listen %s %s\n" % (port, time, tones)
+  con.write(cmd)
 
 def verifyTalkPath(A, B, con, callType):
   """
-  verifies talk path in one direction
-  returns success percentage as a string
+  verifies bidirectional talk path
+  returns success percentage as a string tuple
   """
   count=0.0
-  success=0.0
+  successAB=0.0
+  successBA=0.0
   failed=0
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   initializeSIP(con, A[port])
   initializeSIP(con, B[port])
-  while count<5.0:
+  while count<2.0:
     count +=1
-    time.sleep(6)
-    listenForTones(con, B[port])
-    time.sleep(2)
-    tones='23'
-    sendKeyPress(A, tones)
+    time.sleep(4)
+    tonesA='333'
+    tonesB='444'
+    listenForTones(con, A[port])
+    time.sleep(3)
+    sendKeyPress(B, tonesA)
     result=con.expect(["0x5000", "0x5001"], 15)
-    log.debug("count %f result is %s"%(count,result))
+    log.debug("count %f result from %s to %s is %s"%(count,result, B[name], A[name]))
     if result[0]!=0:
-      success+=1
+      successBA+=1
     else:
-      log.error("Error verifying talk path from %s to %s during %s" %(A[name], B[name]), callType) 
-  return "{0:.0%}".format(success/count)
+      log.error("Error verifying talk path from %s to %s" %(B[name], A[name]))
+    sleep(5)
+    listenForTones(con, B[port])
+    time.sleep(1)
+    sendKeyPress(A, tonesB)
+    result=con.expect(["0x5000", "0x5001"], 15)
+    log.debug("count %f result from %s to %s is %s"%(count,result, A[name], B[name]))
+    if result[0]!=0:
+      successAB+=1
+    else:
+      log.error("Error verifying talk path from %s to %s" %(A[name], B[name]))
+    successRateAB="{0:.0%}".format(successAB/count)
+    successRateBA="{0:.0%}".format(successBA/count)
+  sleep(2)
+  return (successRateAB, successRateBA)
 
 def verifyCallPath(A,B,con, callType):
   """
@@ -621,9 +599,12 @@ def verifyCallPath(A,B,con, callType):
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   sleep(1)
-  agood=isConnected(A)
-  bgood=isConnected(B)
-  if agood and bgood:
+  agood=False
+  bgood=False
+  while not (agood and bgood):
+    agood=isConnected(A)
+    bgood=isConnected(B)
+  if (agood and bgood):
     #crank up the headset volumes
     maxVolume(A)
     maxVolume(B)
@@ -637,22 +618,23 @@ def verifyCallPath(A,B,con, callType):
       log.error("%s is not connected"%(B[name],))
   log.info('%s test initiated between %s and %s' %(callType, A[name], B[name]))
   #seize associated ports and get them into Connected state
-  log.info('initiating talk path verification from %s to %s in %s'% (A[name], B[name], callType))
-  successAB=verifyTalkPath(A,B,con, callType)
-  log.info('%s success rate from %s to %s in %s'%(successAB,A[name], B[name], callType))  
-  log.info('initiating talk path verification from %s to %s'% (B[name], A[name]))
-  successBA=verifyTalkPath(B,A,con, callType)
-  log.info('%s success rate from %s to %s in %s'%(successBA,B[name], A[name], callType))
+  log.info('initiating talk path verification between %s and %s during %s'% (A[name], B[name], callType))
+  (successRateAB, successRateBA)=verifyTalkPath(A,B,con, callType)
+  log.info('%s success rate from %s to %s in %s'%(successRateAB,A[name], B[name], callType))  
+  log.info('%s success rate from %s to %s in %s'%(successRateBA,B[name], A[name], callType))
   log.info('%s test complete'%(callType, ))
-  return (successAB, successBA)
-           
-def initializeCall(A, B, callType, log):
-  call(A,B, True)
+  return (successRateAB, successRateBA)
+
+def initializeCall(A, B, callType, log, inHeadsetMode):
+  """
+  initializes a call of callType between A and B
+  waits for B to start ringing and then connects
+  """
+  call(A,B, inHeadsetMode)
   log.info('initiallizing %s between %s and %s' %(callType, A[name], B[name]))
   while not isRinging(B):
     sleep(1)
   connect(B)
-  return True
 
 def normalCall(A, B, con):
   """
@@ -662,7 +644,7 @@ def normalCall(A, B, con):
   """
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  initializeCall(A, B, 'normal call', log)
+  initializeCall(A, B, 'normal call', log, False)
   verifyCallPath(A, B, con, 'normal call')
   disconnect(A)
   
@@ -675,22 +657,20 @@ def conferenceCall(A,B,C, con):
   """
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  connected=initializeCall(A,B,'conference call A', log)
-  while not connected:
-    sleep(1)
+  initializeCall(A,B,'conference call AB', log, False)
+  verifyCallPath(A, B, con, 'conference call leg AB')
   pressConference(A)
-  sleep(5)
-  connected=initializeCall(A,C,'conference call B', log)
-  while not connected:
-    connected=initializeCall(A,C,'conference call B', log)
+  initializeCall(A,C,'conference call AC', log, True)
+  verifyCallPath(A, B, con, 'conference call leg AC')
   pressConference(A)
-  sleep(1)
-  log.info("connecting conference calls B->A")
-  verifyCallPath(A, B, con, 'conference call')
-  verifyCallPath(A, C, con, 'conference call')
-  verifyCallPath(B, C, con, 'conference call')
+  sleep(2)
+  log.info("connecting conference call legs AB->AC")
+  verifyCallPath(A, B, con, 'conference call ABC')
+  verifyCallPath(A, C, con, 'conference call ABC')
+  verifyCallPath(B, C, con, 'conference call ABC')
   disconnect(A)
   disconnect(B)
+  disconnect(C)
   
 def attendedTransferCall(A, B, C, con):
   """
@@ -702,7 +682,7 @@ def attendedTransferCall(A, B, C, con):
   """
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  initializeCall(A, B, 'attended transfer call', log)
+  initializeCall(A, B, 'attended transfer call', log, False)
   #sleep(5)
   verifyCallPath(A, B, con, 'attended transfer call')
   attendedTransfer(A, C, con)
@@ -720,10 +700,10 @@ def unattendedTransferCall(A, B, C, con):
   """
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  initializeCall(A, B, 'normal call', log)
-  verifyCallPath(A, B, con, 'unattended transfer call')
+  initializeCall(A, B, 'unattended transfer AB', log, False)
+  verifyCallPath(A, B, con, 'unattended transfer AB')
   unattendedTransfer(A, C)
-  verifyCallPath(C, B, con, 'unattended transfer call')
+  verifyCallPath(C, B, con, 'unattended transfer BC')
   disconnect(B)
   
 def blindTransferCall(A, B, C, con):
@@ -736,11 +716,11 @@ def blindTransferCall(A, B, C, con):
   """
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  initializeCall(A, B, 'blind transfer call', log)
-  verifyCallPath(A, B, con, 'blind transfer call')
-  blindTransfer(A[IP], C[number], C[IP])
-  verifyCallPath(C, B, con, 'blind transfer call')
-  disconnect(B[IP])
+  initializeCall(A, B, 'blind transfer call', log, False)
+  verifyCallPath(A, B, con, 'blind transfer AB')
+  blindTransfer(A, C)
+  verifyCallPath(C, B, con, 'blind transfer  BC')
+  disconnect(B)
   
 def setupLogging(level):
   #setup basic logging configuration for INFO
@@ -774,37 +754,22 @@ def test():
   """
   con=initialize(BULK_CALLER, INFO)
   log=setLogging(__name__)
-
-
-  #conferenceCall(A,B,C,con)
-  attendedTransferCall(A,B,C,con)
-  #unattendedTransferCall(A,B,C,con)
-  #blindTransferCall(A,B,C,con)
   
-  
-  #conferenceCall(A,B,C, con)
 
-
-  
   
   """
-  Old unit tests down here
+  Completed unit tests down here
   """
   #disconnect(A[IP])
-  #normalCall(A,B,con)
-  #normalCall(A,C,con)
-  #normalCall(B,C,con)
-  #initializeCall(A,B,'test', log)
-  #pressConference(A[IP])
-  #sleep(10)
-  # call(A[IP], C[number])
-  #sleep(1)
-  #initializeCall(A,C,'test2',log)
+  #normalCall(A,B,con) #good
+  #normalCall(A,C,con) #good
+  #normalCall(B,C,con) #good
+  attendedTransferCall(A,B,C,con)   #good 
+  unattendedTransferCall(A,B,C,con) #good
+  blindTransferCall(A,B,C,con) #good
+  conferenceCall(A,B,C,con) #good
   
-  
-
-
-  
+ 
 
 
 if __name__=="__main__":
