@@ -724,8 +724,9 @@ def blindTransferCall(A, B, C, con):
   
 def setupLogging(level):
   #setup basic logging configuration for INFO
+  #format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',  !!!leaving outmodule name since it will always be the same
   logging.basicConfig(level=level,
-                      format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                      format='%(asctime)s %(levelname)-8s %(message)s',
                       datefmt='%m-%d %H:%M',
                       filename='AutoCallPathVerify.log',
                       filemode='w')
@@ -761,9 +762,9 @@ def test():
   Completed unit tests down here
   """
   #disconnect(A[IP])
-  #normalCall(A,B,con) #good
+  normalCall(A,B,con) #good
   normalCall(A,C,con) #good
-  #normalCall(B,C,con) #good
+  normalCall(B,C,con) #good
   #attendedTransferCall(A,B,C,con)   #good 
   #unattendedTransferCall(A,B,C,con) #good
   #blindTransferCall(A,B,C,con) #good
