@@ -1,17 +1,6 @@
 #!/usr/bin/env python
 #########################################################################################################################
-# This program is free software; you can redistribute it and/or modify it 
-# under the terms of the GNU public license as published by the Free Software
-# Foundation.
-# 
-# This program is distributed in the hopes that it will be useful but without 
-# any warranty, even implied, of merchantability or fitness for a particular
-# purpose.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-#
+# This software belongs to Adtran, Inc.
 # Author Jeffrey McAnarney from U.S. 7/26/2013
 # 
 #
@@ -575,9 +564,9 @@ def verifyTalkPath(A, B, con, callType):
     tonesB='444'
     listenForTones(con, A[port])
     time.sleep(3)
-    log.info("Sending %s to %s from %s"%(tonesA, A[name], B[name]))
+    log.info("Listening for a %s on fxo %s"%(tonesA[0], B[port]))
     sendKeyPress(B, tonesA)
-    result=con.expect(["0x5000", "0x5001"], 15)
+    result=con.expect(["0x5000", "0x5001"], 10)
     log.debug("count %f result from %s to %s is %s"%(count,result, B[name], A[name]))
     if result[0]!=0:
       successBA+=1
@@ -585,8 +574,8 @@ def verifyTalkPath(A, B, con, callType):
       log.error("Error verifying talk path from %s to %s" %(B[name], A[name]))
     sleep(10)
     listenForTones(con, B[port])
-    time.sleep(1)
-    log.info("Sending %s to %s from %s"%(tonesB, B[name], A[name]))
+    time.sleep(3)
+    log.info("Listening for a %s on fxo %s"%(tonesB[0], A[port]))
     sendKeyPress(A, tonesB)
     result=con.expect(["0x5000", "0x5001"], 15)
     log.debug("count %f result from %s to %s is %s"%(count,result, A[name], B[name]))
