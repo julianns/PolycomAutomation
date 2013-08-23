@@ -111,11 +111,11 @@ send=" send-tones 123456\n"
 sls=" supervision loop-start\n"    
 
 #All parameters modified with A, B, or C reference the three possible actors in calling scenarios
-A={name:"Maynard Keenan", IP:"10.17.220.217", number:"5551111", port:"0/1"}
-B={name:"Roger Daltry", IP:"10.17.220.218", number:"5551112", port:"0/2"}
-C={name:"Getty Lee", IP:"10.17.220.219", number:"5552112", port:"0/3"}
-D={name:"Freedie Mercury", IP:"10.17.220.220", number:"5552113", port:False}
-BULK_CALLER="10.17.220.7"
+A={name:"Maynard Keenan", IP:"10.10.10.101", number:"5551111", port:"0/1"}
+B={name:"Roger Daltry", IP:"10.10.10.102", number:"5551112", port:"0/2"}
+C={name:"Getty Lee", IP:"10.10.10.103", number:"5551113", port:"0/3"}
+D={name:"Freedie Mercury", IP:"10.10.10.104", number:"555114", port:False}
+BULK_CALLER="10.10.10.16"
 
 
 
@@ -164,13 +164,22 @@ def isRinging(A):
   state=sendPoll(A)
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  try: 
+    line=(state["LineState"])
+  except:
+    log.warn('No headers returned from poll')
+    return False
   try:
     result=(state["CallState"]=="Offering")
     log.debug('%s returned from %s'% (result, (getFunctionName())))
     return result
   except:
-    log.warn('No headers returned from poll')
-    return False
+    if line=='Inactive':
+      log.warn('Line is inctive')
+      return False
+    else:
+      log.warn('Unknown error: %s', state)
+      return False
 
 def isConnected(A):
   """
@@ -538,7 +547,7 @@ def initializeSIP(con, port):
   con.write(cmd)
   con.expect(['Connected'], 2)
 
-def listenForTones(con, port, time='18000', tones='1'):
+def listenForTones(con, port, time='10000', tones='1'):
   """
   Takes a port in Connected State and
   listens for $time MS for $tones tones
@@ -559,13 +568,14 @@ def verifyTalkPath(A, B, con, callType):
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   initializeSIP(con, A[port])
   initializeSIP(con, B[port])
-  while count<2.0:
+  while count<4.0:
     count +=1
     time.sleep(4)
     tonesA='333'
     tonesB='444'
     listenForTones(con, A[port])
     time.sleep(3)
+    log.info("Sending %s to %s from %s"%(tonesA, A[name], B[name]))
     sendKeyPress(B, tonesA)
     result=con.expect(["0x5000", "0x5001"], 15)
     log.debug("count %f result from %s to %s is %s"%(count,result, B[name], A[name]))
@@ -573,9 +583,10 @@ def verifyTalkPath(A, B, con, callType):
       successBA+=1
     else:
       log.error("Error verifying talk path from %s to %s" %(B[name], A[name]))
-    sleep(5)
+    sleep(10)
     listenForTones(con, B[port])
     time.sleep(1)
+    log.info("Sending %s to %s from %s"%(tonesB, B[name], A[name]))
     sendKeyPress(A, tonesB)
     result=con.expect(["0x5000", "0x5001"], 15)
     log.debug("count %f result from %s to %s is %s"%(count,result, A[name], B[name]))
@@ -741,7 +752,7 @@ def initialize(ip, level):
   setupLogging(level)
   con=telnet(ip)
   prompt=login(con)
-  return (con)
+  return (con, prompt)
 
 
 
@@ -752,7 +763,7 @@ def test():
   """
   Unit testing of automation script
   """
-  con=initialize(BULK_CALLER, INFO)
+  (con, prompt)=initialize(BULK_CALLER, INFO)
   log=setLogging(__name__)
   
 
@@ -762,12 +773,12 @@ def test():
   """
   #disconnect(A[IP])
   #normalCall(A,B,con) #good
-  #normalCall(A,C,con) #good
+  normalCall(A,C,con) #good
   #normalCall(B,C,con) #good
-  attendedTransferCall(A,B,C,con)   #good 
-  unattendedTransferCall(A,B,C,con) #good
-  blindTransferCall(A,B,C,con) #good
-  conferenceCall(A,B,C,con) #good
+  #attendedTransferCall(A,B,C,con)   #good 
+  #unattendedTransferCall(A,B,C,con) #good
+  #blindTransferCall(A,B,C,con) #good
+  #conferenceCall(A,B,C,con) #good
   
  
 
