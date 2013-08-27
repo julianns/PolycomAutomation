@@ -95,6 +95,7 @@ PROMPT=""
 con=telnetlib.Telnet()
 
 #just so I can avoid quotes in all my keys
+pType="pYtpe"
 BC="BC"
 name="name"
 IP="IP"
@@ -113,17 +114,18 @@ on=" on-hook\n"
 seize=" seize\n"                 
 dial=" send-digits "          
 send=" send-tones 123456\n"                      
-sls=" supervision loop-start\n"    
+sls=" supervision loop-start\n"
+sentTones=re.compile("0x5002 (Sent Path COnfirmation Tones) () - 0x0004 to 0x0004 (Connected to Connected)")
 
 #Add SIP Phone disctionaries
-SIP_A={type:IP, name:"Maynard Keenan", IP:"10.10.10.101", number:"5551111", port:"0/1"}
-SIP_B={type:IP, name:"Roger Daltry", IP:"10.10.10.102", number:"5551112", port:"0/2"}
-SIP_C={type:IP, name:"Getty Lee", IP:"10.10.10.103", number:"5551113", port:"0/3"}
-SIP_D={type:IP, name:"Freddie Mercury", IP:"10.10.10.104", number:"555114", port:False}
+SIP_A={pType:IP, name:"Maynard Keenan", IP:"10.10.10.101", number:"5551111", port:"0/1"}
+SIP_B={pType:IP, name:"Roger Daltry", IP:"10.10.10.102", number:"5551112", port:"0/2"}
+SIP_C={pType:IP, name:"Getty Lee", IP:"10.10.10.103", number:"5551113", port:"0/3"}
+SIP_D={pType:IP, name:"Freddie Mercury", IP:"10.10.10.104", number:"555114", port:False}
 
 #Add Bulk Caller Phone Dictionaries
-BC_A={type:BC, name:"John Bonham", IP:False, number:"555114", port:"0/7"}
-BC_B={type:BC, name:"Neil Pert", IP:False, number:"5561012", port:"0/8"}
+BC_A={pType:BC, name:"John Bonham", IP:False, number:"5551011", port:"0/7"}
+# dead port BC_B={pType:BC, name:"Neil Pert", IP:False, number:"5561012", port:"0/8"}
 
 BULK_CALLER="10.10.10.16"
 
@@ -146,11 +148,12 @@ def isRinging(A):
   """
   Returns True if phone has incoming call, else False
   """
-  state=sendPoll(A)
+  
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  if A[type]==IP:
-    try: 
+  if A[pType]==IP:
+    try:
+      state=sendPoll(A)
       line=(state["LineState"])
     except:
       log.warn('No headers returned from poll')
@@ -161,15 +164,16 @@ def isRinging(A):
       return result
     except:
       if line=='Inactive':
-        log.warn('Line is inctive')
+        log.warn('Line is inactive')
         return False
       else:
         log.warn('Unknown error: %s', state)
         return False
-  elif A[type]==BC:
+  elif A[pType]==BC:
     #this is kind of kludgy, but there is no way to poll for state yet, so I must make an assumption then test it
     #I'll go off hook and expect "to Connected".  "Wrong State" means it is not ringing
-    goOffHook(A)
+    ringing=goOffHook(A)
+    return ringing
 
 def isConnected(A):
   """
@@ -177,7 +181,7 @@ def isConnected(A):
   """
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  if A[type]==IP:  
+  if A[pType]==IP:  
     state=sendPoll(A)
     try:
       result=(state["CallState"]=="Connected" or state["CallState"]=="CallConference")
@@ -186,11 +190,12 @@ def isConnected(A):
     except Exception:
       log.error(Exception)
       return False
-  elif A[type]==BC:
+  elif A[pType]==BC:
     #this is kind of kludgy, but there is no way to poll for state yet.  I'll go off hook and expect " to Connected".
     #Whether current state is ringing or connected, the BC will return "<STATE> to Connected"
     #Any other response means it is not connected
-    goOffHook(A)
+    connected= goOffHook(A)
+    return connected
 
 def call(A, B, inHeadsetMode):
   """
@@ -214,9 +219,9 @@ def connect(A):
   """
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  if A[type]==IP:
+  if A[pType]==IP:
     pressHeadset(A)
-  elif A[type]==BC:
+  elif A[pType]==BC:
     goOffHook(A)
     
 def disconnect(A):
@@ -227,14 +232,14 @@ def disconnect(A):
   """
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  if A[type]==IP:
+  if A[pType]==IP:
     state=sendPoll(A)
     try:
       if state['CallState']=="Connected":
-        pressHeadset(A)
+        pressEndCall(A)
     except Exception:
       pass
-  elif A[type]==BC:
+  elif A[pType]==BC:
     goOnHook(A)
 
 def attendedTransfer(A, C):
@@ -381,7 +386,11 @@ def sendKeyPress(A, number):
   payload=PAYLOAD_A+constructDialPadString(number)+PAYLOAD_B
   url=constructPushURL(A)
   sendCurl(payload, url)
-  
+ 
+def sendTones(A, number):
+  cmd="script-manager fxo %s send-tones %s\n" % (A[port], number)
+  con.write(cmd)
+
 def maxVolume(A):
   for i in range(10):
     payload=(PAYLOAD_A+"Key:VolUp"+PAYLOAD_B)
@@ -408,9 +417,27 @@ def pressHeadset(A):
     PAYLOAD=(PAYLOAD_A+"Key:Headset"+PAYLOAD_B)
     sendCurl(PAYLOAD, URL)
 
+def pressEndCall(A):
+    URL=constructPushURL(A)
+    PAYLOAD=(PAYLOAD_A+"Key:Softkey2"+PAYLOAD_B)
+    sendCurl(PAYLOAD, URL)
+
 def goOffHook(A):
+  success="to Connected"
+  temp=con.read_eager()
   con.write("script-manager fxo %s off-hook\n" % (A[port],))
-  con.expect([BC_RESPONSE,],5)
+  result=con.expect([BC_RESPONSE, "to Connected"],5)
+ 
+  #THIS IS UGLY
+  try:
+    if success in result[1].group(2):
+      return True
+  except Exception:
+    pass
+  if result[0]==1:
+    return True
+  else:
+    return False
   #con.read_until(PROMPT)
 
 def goOnHook(A):
@@ -476,12 +503,12 @@ def initializePort(port):
   cmd=baseCommand + on
   con.write(cmd)
   con.expect([''], 2)
-  con.read_until(PROMPT)  
+  con.read_until(PROMPT, 5)  
   # results in Idle state
   cmd=baseCommand + db
   con.write(cmd)
   con.expect(['to Idle'], 2)
-  con.read_until(PROMPT)  
+  con.read_until(PROMPT, 5)  
 
 def initializeSIP(port):
   """
@@ -529,40 +556,61 @@ def verifyTalkPath(A, B, callType):
   log=setLogging(__name__)
   log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   #bulk caller calls will already be in connected state, initiallize the ports on BC for SIP phones
-  if A[type]==IP:
+  if A[pType]==IP:
     initializeSIP(A[port])
-  if B[type]==IP:
+  if B[pType]==IP:
     initializeSIP(B[port])
-  while count<4.0:
+  while count<2.0:
     count +=1
-    time.sleep(4)
-    tonesA='333'
-    tonesB='444'
-    listenForTones(A[port])
+    time.sleep(15)
+    tonesA='3333'
+    tonesB='4444'
+    if B[pType]==BC:
+      listenForTones(A[port], time=15000)
+    else:
+      listenForTones(A[port])
     time.sleep(3)
     log.info("Listening for a %s on fxo %s"%(tonesA[0], B[port]))
-    sendKeyPress(B, tonesA)
-    result=con.expect([BC_RESPONSE,], 10)
-    #con.read_until(PROMPT)
-    log.info("%s received %s from %s" %(result[1].group(4), B[name], A[name]))
-    if result[1].group(2)=="5000":
-      successBA+=1
+    if B[pType]==IP:
+      sendKeyPress(B, tonesA)
     else:
-      log.error("Error: %s, received (%s) from %s" %(result[1].group(3), result[1].group(4), B[name]))
-    sleep(10)
-    listenForTones(B[port])
+      sendTones(B, tonesA)
+    result=con.expect([BC_RESPONSE,], 10)
+    try:
+      while result[1].group(2) not in ['5000', '5001']:
+        result=con.expect([BC_RESPONSE,], 15)
+      log.info("%s: received (%s) on fxo %s" %(result[1].group(2), result[1].group(4), B[port]))
+      if result[1].group(2)=="5001":
+        successAB+=1
+      else:
+        log.error("Error: %s" %result[1].group(0))
+    except:
+      log.error("Error: unknown return value")
+    sleep(20)
+    if A[pType]==BC:
+      listenForTones(B[port], time=15000)
+    else:
+      listenForTones(B[port])
     time.sleep(3)
     log.info("Listening for a %s on fxo %s"%(tonesB[0], A[port]))
-    sendKeyPress(A, tonesB)
-    result=con.expect([BC_RESPONSE,], 15)
-    #con.read_until(PROMPT)
-    log.info("%s received %s from %s" %(result[1].group(4), B[name], A[name]))
-    if result[1].group=="5000":
-      successAB+=1
+    if A[pType]==IP:
+      sendKeyPress(A, tonesB)
     else:
-      log.error("Error: %s, received (%s) from %s" %(result[1].group(3), result[1].group(4), B[name]))
-    successRateAB="{0:.0%}".format(successAB/count)
-    successRateBA="{0:.0%}".format(successBA/count)
+      sendTones(A, tonesB)
+    result=con.expect([BC_RESPONSE,], 15)
+    try:
+      while result[1].group(2) not in ['5000', '5001']:
+        result=con.expect([BC_RESPONSE,], 15)
+      log.info("%s: received (%s) on fxo %s" %(result[1].group(2), result[1].group(4), A[port]))
+      if result[1].group(2)=="5001":
+        successBA+=1
+      else:
+        log.error("Error: %s" %result[1].group(0))
+    except:
+      log.error("Error: unknown return value")
+  sleep(5)
+  successRateAB="{0:.0%}".format(successAB/count)
+  successRateBA="{0:.0%}".format(successBA/count)
   sleep(2)
   return (successRateAB, successRateBA)
 
@@ -585,8 +633,10 @@ def verifyCallPath(A, B, callType):
     bgood=isConnected(B)
   if (agood and bgood):
     #crank up the headset volumes
-    maxVolume(A)
-    maxVolume(B)
+    if A[pType]==IP:
+      maxVolume(A)
+    if B[pType]==IP:
+      maxVolume(B)
     log.info('%s is connected to %s'% (A[name], B[name]))
   else:
     #should never ever get here...
@@ -598,7 +648,7 @@ def verifyCallPath(A, B, callType):
   log.info('%s test initiated between %s and %s' %(callType, A[name], B[name]))
   #seize associated ports and get them into Connected state
   log.info('initiating talk path verification between %s and %s during %s'% (A[name], B[name], callType))
-  (successRateAB, successRateBA)=verifyTalkPath(A,B,con, callType)
+  (successRateAB, successRateBA)=verifyTalkPath(A, B, callType)
   log.info('%s success rate from %s to %s in %s'%(successRateAB,A[name], B[name], callType))  
   log.info('%s success rate from %s to %s in %s'%(successRateBA,B[name], A[name], callType))
   log.info('%s test complete'%(callType, ))
@@ -626,6 +676,7 @@ def normalCall(A, B):
   initializeCall(A, B, 'normal call', log, False)
   verifyCallPath(A, B, 'normal call')
   disconnect(A)
+  disconnect(B)
   
 def conferenceCall(A, B, C):
   """
@@ -668,6 +719,7 @@ def attendedTransferCall(A, B, C):
   #sleep(5)
   verifyCallPath(C, B, 'attended transfer call')
   disconnect(B)
+  disconnect(C)
   
 def unattendedTransferCall(A, B, C):
   """
@@ -684,6 +736,7 @@ def unattendedTransferCall(A, B, C):
   unattendedTransfer(A, C)
   verifyCallPath(C, B, 'unattended transfer BC')
   disconnect(B)
+  disconnect(C)
   
 def blindTransferCall(A, B, C):
   """
@@ -700,6 +753,7 @@ def blindTransferCall(A, B, C):
   blindTransfer(A, C)
   verifyCallPath(C, B, 'blind transfer  BC')
   disconnect(B)
+  disconnect(C)
   
 def setupLogging(level):
   #setup basic logging configuration for INFO
@@ -721,10 +775,14 @@ def initializeTest(ip, level):
   global PROMPT
   global con
   setupLogging(level)
-  telnet(ip)
+  con=telnet(ip)
   if con==-1:
     exit()
   PROMPT=login()
+  for i in range(1,9):
+    port="0/"+str(i)
+    initializePort(port)
+  
   
 
 
@@ -745,13 +803,13 @@ def test():
   Completed unit tests down here
   """
   #disconnect(A[IP])
-  normalCall(SIP_A,SIP_B) #good
-  #normalCall(A,C) #good
-  #normalCall(B,C) #good
-  #attendedTransferCall(A,B,C)   #good 
-  #unattendedTransferCall(A,B,C) #good
-  #blindTransferCall(A,B,C) #good
-  #conferenceCall(A,B,C) #good
+  normalCall(SIP_A,BC_A) #good
+  normalCall(SIP_A,SIP_C) #good
+  #normalCall(SIP_B,SIP_C) #good
+  #attendedTransferCall(SIP_A,SIP_B,SIP_C)   #good 
+  #unattendedTransferCall(SIP_A,SIP_B,SIP_C) #good
+  #blindTransferCall(SIP_A,SIP_B,SIP_C) #good
+  #conferenceCall(SIP_A,SIP_B,SIP_C) #good
   
  
 
