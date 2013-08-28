@@ -126,8 +126,8 @@ SIP_D={pType:IP, name:"Freddie Mercury", IP:"10.10.10.104", number:"555114", por
 BC_A={pType:BC, name:"John Bonham", IP:False, number:"5551011", port:"0/7"}
 
 #Add 
-PRI2FXO_A={pType:BC, name:"Jimmy Hendrix", IP:False, number:"5561011", port:"0/7"}
-PRI2FXO_B={pType:IP, name:"B.B. King", IP:"10.10.10.102", number:"5561011", port:"0/2"}
+PRI2FXO_A={pType:BC, name:"Phil Collins", IP:False, number:"5561011", port:"0/7"}
+PRI2FXO_B={pType:IP, name:"Tom Morelos", IP:"10.10.10.102", number:"5561011", port:"0/2"}
 
 BULK_CALLER="10.10.10.16"
 
@@ -575,7 +575,8 @@ def verifyTalkPath(A, B, callType):
     time.sleep(2)#pause for BC
     log.info("Listening for a %s on fxo %s: %s -> %s"%(tonesA[0], A[port], B[name], A[name]))
     if B[pType]==IP:
-      sendKeyPress(B, tonesA)
+      sendTones(B, tonesA)
+      #sendKeyPress(B, tonesA)
     else:
       sendTones(B, tonesA)
     result=con.expect([BC_RESPONSE,], 10)
@@ -597,7 +598,8 @@ def verifyTalkPath(A, B, callType):
     time.sleep(2)#pause for BC
     log.info("Listening for a %s on fxo %s: %s -> %s"%(tonesB[0], B[port], A[name], B[name]))
     if A[pType]==IP:
-      sendKeyPress(A, tonesB)
+      sendTones(A, tonesB)
+      #sendKeyPress(A, tonesB)
     else:
       sendTones(A, tonesB)
     result=con.expect([BC_RESPONSE,], 15)
@@ -789,12 +791,10 @@ def initializeTest(ip, level):
   if con==-1:
     exit()
   PROMPT=login()
-  """
-  #Probably redundant to do this here
   for i in range(1,9):
     port="0/"+str(i)
     initializePort(port)
-  """
+  
   
   
 
@@ -815,16 +815,15 @@ def test():
   Completed unit tests down here
   """
   #disconnect(A[IP])
-  #normalCall(SIP_A,SIP_B) #good
-  #normalCall(SIP_A,BC_A) #good
-  #sendKeyPress(SIP_A, '123')
-  #normalCall(SIP_A,PRI2FXO_A)
-  normalCall(SIP_A,PRI2FXO_B)
-  #normalCall(SIP_B,SIP_C) #good
-  #attendedTransferCall(SIP_A,SIP_B,SIP_C)   #good 
-  #unattendedTransferCall(SIP_A,SIP_B,SIP_C) #good
-  #blindTransferCall(SIP_A,SIP_B,SIP_C) #good
-  #conferenceCall(SIP_A,SIP_B,SIP_C) #good
+  normalCall(SIP_A,SIP_B) #good
+  normalCall(SIP_A,BC_A) #good
+  normalCall(SIP_A,PRI2FXO_A)
+  normalCall(SIP_A,PRI2FXO_B)#good
+  normalCall(SIP_B,SIP_C) #good
+  attendedTransferCall(SIP_A,SIP_B,SIP_C)   #good 
+  unattendedTransferCall(SIP_A,SIP_B,SIP_C) #good
+  blindTransferCall(SIP_A,SIP_B,SIP_C) #good
+  conferenceCall(SIP_A,SIP_B,SIP_C) #good
   
  
 
