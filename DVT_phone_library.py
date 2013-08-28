@@ -65,6 +65,7 @@ import sys
 import telnetlib
 import time
 import timing
+import atexit
 
 from subprocess import call as syscall
 from sys import exit
@@ -91,6 +92,7 @@ PAYLOAD_A="<PolycomIPPhone><Data priority=\"Critical\">"
 PAYLOAD_B="</Data></PolycomIPPhone>"
 BC_RESPONSE=re.compile(r".*fxo\s(.*) - 0x(\d+)\s\((.*)\)\s\((.*)\).*\((.*)\)")
 PROMPT=""
+RESULTS=[]
 con=telnetlib.Telnet()
 
 #just so I can avoid quotes in all my keys
@@ -100,7 +102,6 @@ name="name"
 IP="IP"
 number="number"
 port="port"
-analog="analog"
 DEBUG=logging.DEBUG
 INFO=logging.INFO
 
@@ -131,15 +132,15 @@ PRI2FXO_B={pType:IP, name:"Tom Morelos", IP:"10.10.10.102", number:"5561011", po
 
 BULK_CALLER="10.10.10.16"
 
-def getFunctionName():
-  return inspect.stack()[1][3]
-
-def getCallingModuleName():
-  return inspect.stack()[3][3]
-
-def getArguments(frame):
-  args, _, _, values = inspect.getargvalues(frame)
-  return [(i, values[i]) for i in args]
+#def getFunctionName():
+#  return inspect.stack()[1][3]
+#
+#def getCallingModuleName():
+#  return inspect.stack()[3][3]
+#
+#def getArguments(frame):
+#  args, _, _, values = inspect.getargvalues(frame)
+#  return [(i, values[i]) for i in args]
 
 def setLogging(name):
   log=logging.getLogger(name)
@@ -152,7 +153,7 @@ def isRinging(A):
   """
   
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   count=0
   if A[pType]==IP:
     try:
@@ -163,16 +164,16 @@ def isRinging(A):
       return False
     try:
       result=(state["CallState"]=="Offering")
-      log.debug('%s returned from %s'% (result, (getFunctionName())))
+      #log.debug('%s returned from %s'% (result, (getFunctionName())))
       return result
     except:
       count+=1
       if count>2:
         if line=='Inactive':
-          log.debug('Line is inactive')
+          #log.debug('Line is inactive')
           return False
       else:
-        log.debug('Unknown error: %s', state)
+        #log.debug('Unknown error: %s', state)
         return False
   elif A[pType]==BC:
     #this is kind of kludgy, but there is no way to poll for state yet, so I must make an assumption then test it
@@ -185,12 +186,12 @@ def isConnected(A):
   Returns True if line state is Active, else False
   """
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if A[pType]==IP:  
     state=sendPoll(A)
     try:
       result=(state["CallState"]=="Connected" or state["CallState"]=="CallConference")
-      log.debug('%s returned from %s'% (result, (getFunctionName())))
+      #log.debug('%s returned from %s'% (result, (getFunctionName())))
       return result
     except Exception:
       log.error(Exception)
@@ -208,7 +209,7 @@ def call(A, B, inHeadsetMode):
   A calls B and if A is not in headeset mode, goes to headset mode
   """
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   URL=constructPushURL(A)
   PAYLOAD=(PAYLOAD_A + "tel:\\"+B[number]+ PAYLOAD_B)
   result=sendCurl(PAYLOAD, URL)
@@ -222,7 +223,7 @@ def connect(A):
   sends a command to BC to go off-hook
   """
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if A[pType]==IP:
     pressHeadset(A)
   elif A[pType]==BC:
@@ -235,7 +236,7 @@ def disconnect(A):
   sends a command to BC to go on-hook
   """
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if A[pType]==IP:
     state=sendPoll(A)
     try:
@@ -252,7 +253,7 @@ def attendedTransfer(A, C):
   From connected call (A-B), performs attended transfer resulting in (B-C)
   """
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if isConnected(A):
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     URL=constructPushURL(A)
@@ -274,7 +275,7 @@ def unattendedTransfer(A, C):
   From connected call (A-B), performs unattended transfer resulting in (B-C)
   """
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if isConnected(A):
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     URL=constructPushURL(A)
@@ -293,7 +294,7 @@ def blindTransfer(A, C):
   From connected call (A-B), performs blind transfer resulting in (B-C)
   """
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if isConnected(A):
     URL=constructPushURL(A)
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
@@ -309,8 +310,8 @@ def constructPushURL(A):
   """ 
   result=URL_A + A[IP] + URL_B
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  log.debug('%s returned from %s'% (result, (getFunctionName())))  
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s returned from %s'% (result, (getFunctionName())))  
   return result
 
 def constructDialPadString(number):
@@ -318,8 +319,8 @@ def constructDialPadString(number):
   for n in str(number):
     dialPadString+="Key:Dialpad"+n+"\n"
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  log.debug('%s returned from %s'% (dialPadString, (getFunctionName())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s returned from %s'% (dialPadString, (getFunctionName())))
   return dialPadString
  
 def sendCurl(payload, URL):
@@ -329,7 +330,7 @@ def sendCurl(payload, URL):
   AUTH=USER+":"+PWD
   curl=['curl', '--digest', '-u', AUTH, '-d', payload, '--header', HEADERA , '--header', HEADERB , URL]
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   return syscall(curl)
 
 def sendRequest(payload, URL):
@@ -338,8 +339,8 @@ def sendRequest(payload, URL):
   DATA=json.dumps(payload)
   result=requests.post(URL, auth=AUTH, verify=False, data=DATA, headers=HEADERS)
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  log.debug('%s returned from %s'% (result.status_code, (getFunctionName())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s returned from %s'% (result.status_code, (getFunctionName())))
   return result
    
 def sendPoll(A, pollType="callstate"):
@@ -355,26 +356,26 @@ def sendPoll(A, pollType="callstate"):
   global PWD
   count=0
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   payload="http://" + A[IP] + "/polling/"+pollType+"Handler"
   result=requests.get(payload, auth=AUTH)
   while result.status_code!=200:
     if count>5:
       sys.exit()
-    log.debug('%s returned from sendPoll; regenerating Authorization'%(result.status_code,))
+    #log.debug('%s returned from sendPoll; regenerating Authorization'%(result.status_code,))
     AUTH=digest(USER, PWD)
     result=requests.get(payload, auth=AUTH)
     count+=1
   XMLstring=result.text.splitlines()
-  log.debug("Result of poll is %s" %(XMLstring,))
+  #log.debug("Result of poll is %s" %(XMLstring,))
   pattern=re.compile(r".*<(.*)>(.*)<.*")
   state={}
   for line in XMLstring:
-    log.debug("checking %s for XML" %(line))
+    #log.debug("checking %s for XML" %(line))
     m=pattern.match(line)
     if m:
-      log.debug("found match in %s" %(line,))
-      log.debug("Adding key-value pair %s:%s" %(m.group(1),m.group(2)))
+      #log.debug("found match in %s" %(line,))
+      #log.debug("Adding key-value pair %s:%s" %(m.group(1),m.group(2)))
       state.update({m.group(1):m.group(2)})
 
   lineState=""
@@ -383,7 +384,7 @@ def sendPoll(A, pollType="callstate"):
       lineState=state["LineState"]
     except:
       log.warn('No headers returned from poll')
-  log.debug('Valid poll response to %s at %s'% ((getFunctionName(), getArguments(inspect.currentframe()))))
+  #log.debug('Valid poll response to %s at %s'% ((getFunctionName(), getArguments(inspect.currentframe()))))
   return state 
 
 def sendKeyPress(A, number):
@@ -407,7 +408,7 @@ def pressConference(A):
   From active call, presses conference softkey
   """
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   state=sendPoll(A)
   callState=state["CallState"]
   
@@ -558,7 +559,7 @@ def verifyTalkPath(A, B, callType):
   successBA=0.0
   failed=0
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   #bulk caller calls will already be in connected state, initialize the ports on BC for SIP phones
   if A[pType]==IP:
     initializeSIP(A[port])
@@ -627,8 +628,9 @@ def verifyCallPath(A, B, callType):
   verifies talk path in both directions
   logs results
   """
+  global RESULTS
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   time.sleep(1)
   agood=False
   bgood=False
@@ -655,6 +657,8 @@ def verifyCallPath(A, B, callType):
   (successRateAB, successRateBA)=verifyTalkPath(A, B, callType)
   log.info('%s success rate from %s to %s in %s'%(successRateBA,B[name], A[name], callType))
   log.info('%s success rate from %s to %s in %s'%(successRateAB,A[name], B[name], callType))  
+  RESULTS.append('%s success rate from %s to %s in %s'%(successRateBA,B[name], A[name], callType))
+  RESULTS.append('%s success rate from %s to %s in %s'%(successRateAB,A[name], B[name], callType))
   log.info('%s test complete'%(callType, ))
   return (successRateAB, successRateBA)
 
@@ -682,7 +686,7 @@ def normalCall(A, B):
   logs results and hangs up
   """
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   initializeCall(A, B, 'normal call', log, False)
   verifyCallPath(A, B, 'normal call')
   disconnect(A)
@@ -696,7 +700,7 @@ def conferenceCall(A, B, C):
   logs results and hangs up
   """
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   initializeCall(A,B,'conference call AB', log, False)
   verifyCallPath(A, B, 'conference call leg AB')
   pressConference(A)
@@ -721,7 +725,7 @@ def attendedTransferCall(A, B, C):
   logs results and hangs up
   """
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   initializeCall(A, B, 'attended transfer call', log, False)
   #time.sleep(5)
   verifyCallPath(A, B, 'attended transfer call')
@@ -740,7 +744,7 @@ def unattendedTransferCall(A, B, C):
   logs results and hangs up
   """
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   initializeCall(A, B, 'unattended transfer AB', log, False)
   verifyCallPath(A, B, 'unattended transfer AB')
   unattendedTransfer(A, C)
@@ -757,7 +761,7 @@ def blindTransferCall(A, B, C):
   logs results and hangs up
   """
   log=setLogging(__name__)
-  log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   initializeCall(A, B, 'blind transfer call', log, False)
   verifyCallPath(A, B, 'blind transfer AB')
   blindTransfer(A, C)
@@ -791,17 +795,19 @@ def initializeTest(ip, level):
   if con==-1:
     exit()
   PROMPT=login()
-  for i in range(1,9):
-    port="0/"+str(i)
+  for i in ['1', '2', '3', '7']:
+    port="0/"+i
     initializePort(port)
   
   
-  
+def finalizeTest():
+  log=setLogging(__name__)
+  log.info('\n\n####RESULTS#####\n\n')
+  for result in RESULTS:
+    log.info(result)
+    
 
-
-
-
-
+atexit.register(finalizeTest)
 
 def test():
   """
@@ -810,20 +816,25 @@ def test():
   initializeTest(BULK_CALLER, INFO)
 
 
+
   
   """
   Completed unit tests down here
   """
   #disconnect(A[IP])
-  normalCall(SIP_A,SIP_B) #good
-  normalCall(SIP_A,BC_A) #good
+  #normalCall(SIP_A,SIP_B) #good
+  #normalCall(SIP_A,BC_A) #good
   normalCall(SIP_A,PRI2FXO_A)
-  normalCall(SIP_A,PRI2FXO_B)#good
-  normalCall(SIP_B,SIP_C) #good
-  attendedTransferCall(SIP_A,SIP_B,SIP_C)   #good 
-  unattendedTransferCall(SIP_A,SIP_B,SIP_C) #good
-  blindTransferCall(SIP_A,SIP_B,SIP_C) #good
+  #normalCall(SIP_A,PRI2FXO_B)#good
+  #normalCall(SIP_B,SIP_C) #good
+  #attendedTransferCall(SIP_A,SIP_B,SIP_C)   #good 
+  #unattendedTransferCall(SIP_A,SIP_B,SIP_C) #good
+  #blindTransferCall(SIP_A,SIP_B,SIP_C) #good
   conferenceCall(SIP_A,SIP_B,SIP_C) #good
+  log.info('\n\n####RESULTS#####\n\n')
+  for result in RESULTS:
+    log.info(result)
+  
   
  
 
