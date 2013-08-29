@@ -131,14 +131,13 @@ PRI2FXO_A={pType:BC, name:"Phil Collins", IP:False, number:"5561011", port:"0/7"
 PRI2FXO_B={pType:IP, name:"Tom Morelos", IP:"10.10.10.102", number:"5561011", port:"0/2"}
 
 BULK_CALLER="10.10.10.16"
-log=logging.getLogger()
 
 log=logging.getLogger('AutoVerify')
-hdlr=logging.FileHandler('auto.log')
-formatter=logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
-hdlr.setFormatter(formatter)
-log.addHandler(hdlr)
-log.setLevel(logging.INFO)
+#hdlr=logging.FileHandler('auto.log')
+#formatter=logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+#hdlr.setFormatter(formatter)
+#log.addHandler(hdlr)
+#log.setLevel(logging.INFO)
 
 def getFunctionName():
   return inspect.stack()[1][3]
@@ -302,7 +301,7 @@ def blindTransfer(A, C):
     URL=constructPushURL(A)
     PAYLOAD=(PAYLOAD_A+"Key:Softkey3"+PAYLOAD_B)
     sendCurl(PAYLOAD, URL)
-    initializeCall(A, C, 'blind transfer BC', log, True)
+    initializeCall(A, C, 'blind transfer call leg BC', log, True)
 
 def constructPushURL(A):
   """
@@ -748,17 +747,17 @@ def blindTransferCall(A, B, C):
   #logs results and hangs up
   """
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  initializeCall(A, B, 'blind transfer call', log, False)
-  verifyCallPath(A, B, 'blind transfer AB')
+  initializeCall(A, B, 'blind transfer call leg AB', log, False)
+  verifyCallPath(A, B, 'blind transfer call leg AB')
   blindTransfer(A, C)
-  verifyCallPath(C, B, 'blind transfer BC')
+  verifyCallPath(C, B, 'blind transfer call leg BC')
   disconnect(B)
   disconnect(C)
   
 def setupLogging(level):
   log=logging.getLogger('AutoVerify')
   hdlr=logging.FileHandler('AutoCallPathVerify.log')
-  formatter=logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+  formatter=logging.Formatter('%(asctime)s %(levelname)-5s %(message)s')
   hdlr.setFormatter(formatter)
   log.addHandler(hdlr)
   log.setLevel(level)
@@ -799,26 +798,27 @@ def test():
   Unit testing of automation script
   """
   initializeTest(BULK_CALLER, INFO)
-
+  for i in range(5):
+    
+  
 
 
   
-  """
-  Completed unit tests down here
-  """
-  #disconnect(A[IP])
-  #normalCall(SIP_A,SIP_B) #good
-  #normalCall(SIP_A,BC_A) #good
-  normalCall(SIP_A,PRI2FXO_A)
-  #normalCall(SIP_A,PRI2FXO_B)#good
-  #normalCall(SIP_B,SIP_C) #good
-  #attendedTransferCall(SIP_A,SIP_B,SIP_C)   #good 
-  #unattendedTransferCall(SIP_A,SIP_B,SIP_C) #good
-  blindTransferCall(SIP_A,SIP_B,PRI2FXO_A) #good
-  conferenceCall(SIP_A,SIP_B,PRI2FXO_A) #good
-  #log.info('\n\n####RESULTS#####\n\n')
-  #for result in RESULTS:
-    #log.info(result)
+    """
+    Completed unit tests down here
+    """
+    #disconnect(A[IP])
+    #normalCall(SIP_A,SIP_B) #good
+    normalCall(SIP_A,BC_A) #good
+    normalCall(SIP_A,PRI2FXO_A)
+    #normalCall(SIP_B,SIP_C) #good
+    attendedTransferCall(SIP_A,SIP_B,SIP_C)   #good 
+    unattendedTransferCall(SIP_A,SIP_B,SIP_C) #good
+    blindTransferCall(SIP_A,SIP_B,PRI2FXO_A) #good
+    conferenceCall(SIP_A,SIP_B,PRI2FXO_A) #good
+    #log.info('\n\n####RESULTS#####\n\n')
+    #for result in RESULTS:
+    #log.info(result) 
   
   
 atexit.register(finalizeTest)
