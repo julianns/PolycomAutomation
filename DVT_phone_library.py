@@ -64,7 +64,7 @@ import re
 import sys
 import telnetlib
 import time
-import timing
+#import timing
 import atexit
 
 from subprocess import call as syscall
@@ -131,16 +131,24 @@ PRI2FXO_A={pType:BC, name:"Phil Collins", IP:False, number:"5561011", port:"0/7"
 PRI2FXO_B={pType:IP, name:"Tom Morelos", IP:"10.10.10.102", number:"5561011", port:"0/2"}
 
 BULK_CALLER="10.10.10.16"
+log=logging.getLogger()
 
-#def getFunctionName():
-#  return inspect.stack()[1][3]
-#
-#def getCallingModuleName():
-#  return inspect.stack()[3][3]
-#
-#def getArguments(frame):
-#  args, _, _, values = inspect.getargvalues(frame)
-#  return [(i, values[i]) for i in args]
+log=logging.getLogger('AutoVerify')
+hdlr=logging.FileHandler('auto.log')
+formatter=logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+hdlr.setFormatter(formatter)
+log.addHandler(hdlr)
+log.setLevel(logging.INFO)
+
+def getFunctionName():
+  return inspect.stack()[1][3]
+
+def getCallingModuleName():
+  return inspect.stack()[3][3]
+
+def getArguments(frame):
+  args, _, _, values = inspect.getargvalues(frame)
+  return [(i, values[i]) for i in args]
 
 def setLogging(name):
   log=logging.getLogger(name)
@@ -152,7 +160,6 @@ def isRinging(A):
   Returns True if phone has incoming call, else False
   """
   
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   count=0
   if A[pType]==IP:
@@ -164,16 +171,16 @@ def isRinging(A):
       return False
     try:
       result=(state["CallState"]=="Offering")
-      #log.debug('%s returned from %s'% (result, (getFunctionName())))
+      ##log.debug('%s returned from %s'% (result, (getFunctionName())))
       return result
     except:
       count+=1
       if count>2:
         if line=='Inactive':
-          #log.debug('Line is inactive')
+          ##log.debug('Line is inactive')
           return False
       else:
-        #log.debug('Unknown error: %s', state)
+        ##log.debug('Unknown error: %s', state)
         return False
   elif A[pType]==BC:
     #this is kind of kludgy, but there is no way to poll for state yet, so I must make an assumption then test it
@@ -185,13 +192,12 @@ def isConnected(A):
   """
   Returns True if line state is Active, else False
   """
-  log=setLogging(__name__)
-  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  ##log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if A[pType]==IP:  
     state=sendPoll(A)
     try:
       result=(state["CallState"]=="Connected" or state["CallState"]=="CallConference")
-      #log.debug('%s returned from %s'% (result, (getFunctionName())))
+      ##log.debug('%s returned from %s'% (result, (getFunctionName())))
       return result
     except Exception:
       log.error(Exception)
@@ -208,7 +214,6 @@ def call(A, B, inHeadsetMode):
   TODO:  Add functionality to initiate from BC
   A calls B and if A is not in headeset mode, goes to headset mode
   """
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   URL=constructPushURL(A)
   PAYLOAD=(PAYLOAD_A + "tel:\\"+B[number]+ PAYLOAD_B)
@@ -222,7 +227,6 @@ def connect(A):
   OR
   sends a command to BC to go off-hook
   """
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if A[pType]==IP:
     pressHeadset(A)
@@ -235,7 +239,6 @@ def disconnect(A):
   OR
   sends a command to BC to go on-hook
   """
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if A[pType]==IP:
     state=sendPoll(A)
@@ -252,7 +255,6 @@ def attendedTransfer(A, C):
   TODO:  Add functionality to initiate from BC
   From connected call (A-B), performs attended transfer resulting in (B-C)
   """
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if isConnected(A):
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
@@ -262,7 +264,7 @@ def attendedTransfer(A, C):
     while not isRinging(C):
       time.sleep(1)
     connect(C)
-    verifyCallPath(A, C, 'attended transfer call')
+    verifyCallPath(A, C, 'attended transfer call AC')
     time.sleep(3)
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
     URL=constructPushURL(A)
@@ -274,7 +276,6 @@ def unattendedTransfer(A, C):
   TODO:  Add functionality to initiate from BC
   From connected call (A-B), performs unattended transfer resulting in (B-C)
   """
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if isConnected(A):
     PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
@@ -293,7 +294,6 @@ def blindTransfer(A, C):
   """
   From connected call (A-B), performs blind transfer resulting in (B-C)
   """
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if isConnected(A):
     URL=constructPushURL(A)
@@ -309,7 +309,6 @@ def constructPushURL(A):
   Given IP address returns properly constructed push URL
   """ 
   result=URL_A + A[IP] + URL_B
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   #log.debug('%s returned from %s'% (result, (getFunctionName())))  
   return result
@@ -318,7 +317,6 @@ def constructDialPadString(number):
   dialPadString=""
   for n in str(number):
     dialPadString+="Key:Dialpad"+n+"\n"
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   #log.debug('%s returned from %s'% (dialPadString, (getFunctionName())))
   return dialPadString
@@ -329,7 +327,6 @@ def sendCurl(payload, URL):
   global PWD
   AUTH=USER+":"+PWD
   curl=['curl', '--digest', '-u', AUTH, '-d', payload, '--header', HEADERA , '--header', HEADERB , URL]
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   return syscall(curl)
 
@@ -338,7 +335,6 @@ def sendRequest(payload, URL):
   global AUTH
   DATA=json.dumps(payload)
   result=requests.post(URL, auth=AUTH, verify=False, data=DATA, headers=HEADERS)
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   #log.debug('%s returned from %s'% (result.status_code, (getFunctionName())))
   return result
@@ -355,14 +351,13 @@ def sendPoll(A, pollType="callstate"):
   global USER
   global PWD
   count=0
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   payload="http://" + A[IP] + "/polling/"+pollType+"Handler"
   result=requests.get(payload, auth=AUTH)
   while result.status_code!=200:
     if count>5:
       sys.exit()
-    #log.debug('%s returned from sendPoll; regenerating Authorization'%(result.status_code,))
+    ##log.debug('%s returned from sendPoll; regenerating Authorization'%(result.status_code,))
     AUTH=digest(USER, PWD)
     result=requests.get(payload, auth=AUTH)
     count+=1
@@ -407,7 +402,6 @@ def pressConference(A):
   IFF connected: conference with number
   From active call, presses conference softkey
   """
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   state=sendPoll(A)
   callState=state["CallState"]
@@ -451,7 +445,6 @@ def goOnHook(A):
   #con.read_until(PROMPT)
 
 def telnet(address):
-  log=setLogging(__name__)
   try:
     con = telnetlib.Telnet(address,23,10)
     return con
@@ -558,7 +551,6 @@ def verifyTalkPath(A, B, callType):
   successAB=0.0
   successBA=0.0
   failed=0
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   #bulk caller calls will already be in connected state, initialize the ports on BC for SIP phones
   if A[pType]==IP:
@@ -567,10 +559,10 @@ def verifyTalkPath(A, B, callType):
     initializeSIP(B[port])
   while count<1.0:
     count +=1
-    tonesA='3333333'
-    tonesB='4444444'
+    tonesA='333'
+    tonesB='444'
     if B[pType]==BC:
-      listenForTones(A[port], time=15000)
+      listenForTones(A[port], time=12000)
     else:
       listenForTones(A[port])
     time.sleep(2)#pause for BC
@@ -591,9 +583,9 @@ def verifyTalkPath(A, B, callType):
         log.error("Error: %s: (%s)" %result[1].group(3). result[1].group(4))
     except:
       log.error("Error: unknown return value")
-    time.sleep(15)
+    time.sleep(5)
     if A[pType]==BC:
-      listenForTones(B[port], time=15000)
+      listenForTones(B[port], time=12000)
     else:
       listenForTones(B[port])
     time.sleep(2)#pause for BC
@@ -603,7 +595,7 @@ def verifyTalkPath(A, B, callType):
       #sendKeyPress(A, tonesB)
     else:
       sendTones(A, tonesB)
-    result=con.expect([BC_RESPONSE,], 15)
+    result=con.expect([BC_RESPONSE,], 10)
     try:
       while result[1].group(2) not in ['5000', '5001']:
         result=con.expect([BC_RESPONSE,], 15)
@@ -626,10 +618,9 @@ def verifyCallPath(A, B, callType):
     verifies connection
     maxes headset volumes
   verifies talk path in both directions
-  logs results
+  #logs results
   """
   global RESULTS
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   time.sleep(1)
   agood=False
@@ -659,7 +650,7 @@ def verifyCallPath(A, B, callType):
   log.info('%s success rate from %s to %s in %s'%(successRateAB,A[name], B[name], callType))  
   RESULTS.append('%s success rate from %s to %s in %s'%(successRateBA,B[name], A[name], callType))
   RESULTS.append('%s success rate from %s to %s in %s'%(successRateAB,A[name], B[name], callType))
-  log.info('%s test complete'%(callType, ))
+  log.info('%s test complete\n\n'%(callType, ))
   return (successRateAB, successRateBA)
 
 def initializeCall(A, B, callType, log, inHeadsetMode):
@@ -674,7 +665,7 @@ def initializeCall(A, B, callType, log, inHeadsetMode):
 
   #time.sleep(6)
   call(A,B, inHeadsetMode)
-  log.info('initializing %s between %s and %s' %(callType, A[name], B[name]))
+  log.info('\n\ninitializing %s between %s and %s' %(callType, A[name], B[name]))
   while not isRinging(B):
     time.sleep(1)
   connect(B)
@@ -683,9 +674,8 @@ def normalCall(A, B):
   """
   places call between A and B,
   verifies talk path in both directions,
-  logs results and hangs up
+  #logs results and hangs up
   """
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   initializeCall(A, B, 'normal call', log, False)
   verifyCallPath(A, B, 'normal call')
@@ -697,15 +687,14 @@ def conferenceCall(A, B, C):
   creates conference call between A,B, and C
   does NOT validate A-B talkpath before conferencing
   verifies talk path in between all three participants
-  logs results and hangs up
+  #logs results and hangs up
   """
-  log=setLogging(__name__)
-  #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
+  ##log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   initializeCall(A,B,'conference call AB', log, False)
   verifyCallPath(A, B, 'conference call leg AB')
   pressConference(A)
   initializeCall(A,C,'conference call AC', log, True)
-  verifyCallPath(A, B, 'conference call leg AC')
+  verifyCallPath(A, C, 'conference call leg AC')
   pressConference(A)
   time.sleep(2)
   log.info("connecting conference call legs AB->AC")
@@ -722,16 +711,15 @@ def attendedTransferCall(A, B, C):
   verifies talk path in both directions,
   attended transfer from A->C
   verifies talk path in both directions,
-  logs results and hangs up
+  #logs results and hangs up
   """
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  initializeCall(A, B, 'attended transfer call', log, False)
+  initializeCall(A, B, 'attended transfer call leg AB', log, False)
   #time.sleep(5)
-  verifyCallPath(A, B, 'attended transfer call')
+  verifyCallPath(A, B, 'attended transfer call leg AB')
   attendedTransfer(A, C)
   #time.sleep(5)
-  verifyCallPath(C, B, 'attended transfer call')
+  verifyCallPath(C, B, 'attended transfer call leg BC')
   disconnect(B)
   disconnect(C)
   
@@ -741,14 +729,13 @@ def unattendedTransferCall(A, B, C):
   verifies talk path in both directions,
   unattended transfer from A->C
   verifies talk path in both directions,
-  logs results and hangs up
+  #logs results and hangs up
   """
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  initializeCall(A, B, 'unattended transfer AB', log, False)
-  verifyCallPath(A, B, 'unattended transfer AB')
+  initializeCall(A, B, 'unattended transfer call leg AB', log, False)
+  verifyCallPath(A, B, 'unattended transfer call leg AB')
   unattendedTransfer(A, C)
-  verifyCallPath(C, B, 'unattended transfer BC')
+  verifyCallPath(C, B, 'unattended transfer call leg BC')
   disconnect(B)
   disconnect(C)
   
@@ -758,41 +745,40 @@ def blindTransferCall(A, B, C):
   verifies talk path in both directions,
   blind transfer from A->C
   verifies talk path in both directions,
-  logs results and hangs up
+  #logs results and hangs up
   """
-  log=setLogging(__name__)
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   initializeCall(A, B, 'blind transfer call', log, False)
   verifyCallPath(A, B, 'blind transfer AB')
   blindTransfer(A, C)
-  verifyCallPath(C, B, 'blind transfer  BC')
+  verifyCallPath(C, B, 'blind transfer BC')
   disconnect(B)
   disconnect(C)
   
 def setupLogging(level):
-  #setup basic logging configuration for INFO
-  #format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',  !!!leaving outmodule name since it will always be the same
-  logging.basicConfig(level=level,
-                      format='%(asctime)s %(levelname)-8s %(message)s',
-                      datefmt='%m-%d %H:%M',
-                      filename='AutoCallPathVerify.log',
-                      filemode='w')
+  log=logging.getLogger('AutoVerify')
+  hdlr=logging.FileHandler('AutoCallPathVerify.log')
+  formatter=logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+  hdlr.setFormatter(formatter)
+  log.addHandler(hdlr)
+  log.setLevel(level)
   #set requests logging to WARNING
   requests_log = logging.getLogger("requests")
   requests_log.setLevel(logging.WARNING)
   
+  
 def initializeTest(ip, level):
   """
-  sets up logging and creates connection to bulk caller
+  sets up #logging and creates connection to bulk caller
   returns telnet connection
   """
   global PROMPT
   global con
   con=telnet(ip)
   setupLogging(level)
-  log=setLogging(__name__)
-  log.info('Initializing test...')
+  log.info('\n\nInitializing test...')
   if con==-1:
+    log.error("No connection to Bulk Caller")
     exit()
   PROMPT=login()
   for i in ['1', '2', '3', '7']:
@@ -801,13 +787,12 @@ def initializeTest(ip, level):
   
   
 def finalizeTest():
-  log=setLogging(__name__)
   log.info('\n\n####RESULTS#####\n\n')
   for result in RESULTS:
     log.info(result)
     
 
-atexit.register(finalizeTest)
+
 
 def test():
   """
@@ -829,14 +814,14 @@ def test():
   #normalCall(SIP_B,SIP_C) #good
   #attendedTransferCall(SIP_A,SIP_B,SIP_C)   #good 
   #unattendedTransferCall(SIP_A,SIP_B,SIP_C) #good
-  #blindTransferCall(SIP_A,SIP_B,SIP_C) #good
-  conferenceCall(SIP_A,SIP_B,SIP_C) #good
-  log.info('\n\n####RESULTS#####\n\n')
-  for result in RESULTS:
-    log.info(result)
+  blindTransferCall(SIP_A,SIP_B,PRI2FXO_A) #good
+  conferenceCall(SIP_A,SIP_B,PRI2FXO_A) #good
+  #log.info('\n\n####RESULTS#####\n\n')
+  #for result in RESULTS:
+    #log.info(result)
   
   
- 
+atexit.register(finalizeTest)
 
 
 if __name__=="__main__":
