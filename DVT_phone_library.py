@@ -119,15 +119,19 @@ sls=" supervision loop-start\n"
 
 
 #Add SIP Phone disctionaries
+#VVX500
+SIP_500={pType:IP, name:"Jay Kay", IP:"10.10.10.108", number:"5551118", alias:"1118", port:"0/3"}
 #VVX400
-SIP_A={pType:IP, name:"Maynard Keenan", IP:"10.10.10.101", number:"5551111", alias:"1111", port:"0/3"}
-SIP_B={pType:IP, name:"Roger Daltry", IP:"10.10.10.102", number:"5551112", alias:"1112", port:"0/2"}
-SIP_C={pType:IP, name:"Getty Lee", IP:"10.10.10.103", number:"5551113", alias:"1113", port:"0/3"}
-SIP_D={pType:IP, name:"Freddie Mercury", IP:"10.10.10.104", number:"555114", port:False}
+SIP_400A={pType:IP, name:"Maynard Keenan", IP:"10.10.10.101", number:"5551111", alias:"1111", port:"0/3"}
+SIP_400B={pType:IP, name:"Roger Daltry", IP:"10.10.10.102", number:"5551112", alias:"1112", port:"0/2"}
+SIP_400C={pType:IP, name:"Getty Lee", IP:"10.10.10.103", number:"5551113", alias:"1113", port:"0/3"}
+SIP_400D={pType:IP, name:"Freddie Mercury", IP:"10.10.10.104", number:"555114", port:False}
 #VVX410
-SIP_E={pType:IP, name:"Alex Turner", IP:"10.10.10.105", number:"5551115", alias:"1115", port:"0/1"}
+SIP_410={pType:IP, name:"Alex Turner", IP:"10.10.10.105", number:"5551115", alias:"1115", port:"0/1"}
+#VVX300
+SIP_300={pType:IP, name:"Damon Albarn", IP:"10.10.10.107", number:"5551117", alias:"1117", port:"0/1"}
 #VVX310
-SIP_F={pType:IP, name:"Noel Gallagher", IP:"10.10.10.106", number:"5551116", alias:"1116", port:"0/3"}
+SIP_310={pType:IP, name:"Noel Gallagher", IP:"10.10.10.106", number:"5551116", alias:"1116", port:"0/2"}
 
 
 #Add Bulk Caller Phone Dictionaries
@@ -229,10 +233,10 @@ def call(A, B, inHeadsetMode):
       pressHeadset(A)
   elif A[pType]==BC:
     baseCommand="script-manager fxo %s " % (A[port],)
-    cmd=baseCommand + on
+    cmd=baseCommand + db
     con.write(cmd)
     time.sleep(1)
-    cmd=baseCommand + db
+    cmd=baseCommand + on
     con.write(cmd)
     time.sleep(1)
     cmd=baseCommand + seize
@@ -546,11 +550,11 @@ def initializeSIP(port):
   """
   baseCommand="script-manager fxo %s " % (port,)
   # results in Idle state
-  cmd=baseCommand + on
-  con.write(cmd)
-  con.expect(['Idle'], 2)
+  #cmd=baseCommand + on
+  #con.write(cmd)
+  #con.expect(['Idle'], 2)
   #con.read_until(PROMPT)
-  time.sleep(1)
+  #time.sleep(1)
   #results in Dialtone state
   cmd=baseCommand + seize
   con.write(cmd)
@@ -561,7 +565,6 @@ def initializeSIP(port):
   cmd=baseCommand + flash
   con.write(cmd)
   con.expect(['Connected'], 2)
-  time.sleep(1)
   #con.read_until(PROMPT)
 
 def listenForTones(port, listenTime='10000', tones='1'):
@@ -590,7 +593,7 @@ def verifyTalkPath(A, B, callType):
     initializeSIP(B[port])
   while count<1.0:
     count +=1
-    tonesA='999' #because some tones aren't noticed by some ports
+    tonesA='333'
     tonesB='444'
     if B[pType]==BC:
       listenForTones(A[port], listenTime=12000)
@@ -830,7 +833,7 @@ def test():
   Unit testing of automation script
   """
   initializeTest(BULK_CALLER, INFO)
-  for i in range(1):
+  for i in range(3):
     
   
 
@@ -840,11 +843,12 @@ def test():
     Completed unit tests down here
     """
     #disconnect(A[IP])
-    #normalCall(SIP_A,SIP_B) #good
-    #normalCall(SIP_A,SIP_B) #good
-    #normalCall(SIP_E,SIP_A)
-    #normalCall(PRI2FXO_A,SIP_B)
-    normalCall(SIP_E,PRI2FXO_A) #good
+    #normalCall(SIP_300,PRI2FXO_A) #good
+    #normalCall(SIP_310,PRI2FXO_A) #good
+    #normalCall(SIP_500,PRI2FXO_A)
+    normalCall(PRI2FXO_A,SIP_300)
+    #normalCall(PRI2FXO_A,SIP_310)
+    #normalCall(PRI2FXO_A,SIP_500) #good
     #attendedTransferCall(SIP_E,SIP_B,SIP_A)   #good 
     #unattendedTransferCall(SIP_E,SIP_B,SIP_A) #good
     #blindTransferCall(SIP_E,SIP_B,PRI2FXO_A) #good
