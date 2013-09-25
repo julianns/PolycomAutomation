@@ -96,7 +96,7 @@ RESULTS=[]
 con=telnetlib.Telnet()
 
 #just so I can avoid quotes in all my keys
-pType="pType"
+pType="pYtpe"
 BC="BC"
 name="name"
 IP="IP"
@@ -138,7 +138,7 @@ SIP_310={pType:IP, name:"Noel Gallagher", IP:"10.10.10.106", number:"5551116", a
 BC_A={pType:BC, name:"John Bonham", IP:False, number:"5551011", port:"0/7"}
 
 #Add 
-PRI2FXO_A={pType:BC, name:"Phil Collins", IP:False, number:"5561011", port:"0/7"}
+PRI2FXO_A={pType:BC, name:"Phil Collins", IP:False, number:"5551011", port:"0/7"}
 PRI2FXO_B={pType:IP, name:"Tom Morelos", IP:"10.10.10.102", number:"5561011", port:"0/2"}
 
 BULK_CALLER="10.10.10.16"
@@ -248,7 +248,6 @@ def call(A, B, inHeadsetMode):
   else :
 	log.error("Unknown pType %s" %A[pType])
 	exit()
-	  
   
 def connect(A):
   """
@@ -419,7 +418,6 @@ def sendKeyPress(A, number):
 def sendTones(A, number):
   cmd="script-manager fxo %s send-tones %s\n" % (A[port], number)
   con.write(cmd)
-  time.sleep(1)
 
 def maxVolume(A):
   for i in range(10):
@@ -456,7 +454,6 @@ def goOffHook(A):
   temp=con.read_eager()
   con.write("script-manager fxo %s off-hook\n" % (A[port],))
   result=con.expect([BC_RESPONSE, "to Connected"],5)
-  time.sleep(1)
  
   #THIS IS UGLY
   try:
@@ -532,14 +529,12 @@ def initializePort(port):
   cmd=baseCommand + on
   con.write(cmd)
   con.expect([''], 2)
-  con.read_until(PROMPT, 5)
-  time.sleep(1)
+  con.read_until(PROMPT, 5)  
   # results in Idle state
   cmd=baseCommand + db
   con.write(cmd)
   con.expect(['to Idle'], 2)
-  con.read_until(PROMPT, 5)
-  time.sleep(1)  
+  con.read_until(PROMPT, 5)  
 
 def initializeSIP(port):
   """
@@ -550,11 +545,11 @@ def initializeSIP(port):
   """
   baseCommand="script-manager fxo %s " % (port,)
   # results in Idle state
-  #cmd=baseCommand + on
-  #con.write(cmd)
-  #con.expect(['Idle'], 2)
+  cmd=baseCommand + on
+  con.write(cmd)
+  con.expect(['Idle'], 2)
   #con.read_until(PROMPT)
-  #time.sleep(1)
+  time.sleep(1)
   #results in Dialtone state
   cmd=baseCommand + seize
   con.write(cmd)
@@ -567,14 +562,13 @@ def initializeSIP(port):
   con.expect(['Connected'], 2)
   #con.read_until(PROMPT)
 
-def listenForTones(port, listenTime='10000', tones='1'):
+def listenForTones(port, time='10000', tones='1'):
   """
   Takes a port in Connected State and
   listens for $time MS for $tones tones
   """
-  cmd="script-manager fxo %s listen %s %s\n" % (port, listenTime, tones)
+  cmd="script-manager fxo %s listen %s %s\n" % (port, time, tones)
   con.write(cmd)
-  time.sleep(1)
 
 def verifyTalkPath(A, B, callType):
   """
@@ -596,7 +590,7 @@ def verifyTalkPath(A, B, callType):
     tonesA='333'
     tonesB='444'
     if B[pType]==BC:
-      listenForTones(A[port], listenTime=12000)
+      listenForTones(A[port], time=12000)
     else:
       listenForTones(A[port])
     time.sleep(2)#pause for BC
@@ -619,7 +613,7 @@ def verifyTalkPath(A, B, callType):
       log.error("Error: unknown return value")
     time.sleep(5)
     if A[pType]==BC:
-      listenForTones(B[port], listenTime=12000)
+      listenForTones(B[port], time=12000)
     else:
       listenForTones(B[port])
     time.sleep(2)#pause for BC
@@ -815,9 +809,9 @@ def initializeTest(ip, level):
     log.error("No connection to Bulk Caller")
     exit()
   PROMPT=login()
-  #for i in ['1', '2', '3', '7']:
-  #  port="0/"+i
-  #  initializePort(port)
+  for i in ['1', '2', '3', '7']:
+    port="0/"+i
+    initializePort(port)
   
   
 def finalizeTest():
@@ -833,7 +827,7 @@ def test():
   Unit testing of automation script
   """
   initializeTest(BULK_CALLER, INFO)
-  for i in range(3):
+  for i in range(1):
     
   
 
@@ -843,16 +837,16 @@ def test():
     Completed unit tests down here
     """
     #disconnect(A[IP])
-    #normalCall(SIP_300,PRI2FXO_A) #good
-    #normalCall(SIP_310,PRI2FXO_A) #good
-    #normalCall(SIP_500,PRI2FXO_A)
-    normalCall(PRI2FXO_A,SIP_300)
-    #normalCall(PRI2FXO_A,SIP_310)
-    #normalCall(PRI2FXO_A,SIP_500) #good
-    #attendedTransferCall(SIP_E,SIP_B,SIP_A)   #good 
-    #unattendedTransferCall(SIP_E,SIP_B,SIP_A) #good
-    #blindTransferCall(SIP_E,SIP_B,PRI2FXO_A) #good
-    #conferenceCall(SIP_E,SIP_A,SIP_B) #good
+    normalCall(SIP_410,PRI2FXO_A) #good
+    normalCall(SIP_310,PRI2FXO_A) #good
+    normalCall(SIP_400A,PRI2FXO_A)
+    normalCall(PRI2FXO_A,SIP_410)
+    normalCall(PRI2FXO_A,SIP_310)
+    normalCall(PRI2FXO_A,SIP_400A) #good
+    #attendedTransferCall(SIP_A,SIP_B,SIP_C)   #good 
+    #unattendedTransferCall(SIP_A,SIP_B,SIP_C) #good
+    #blindTransferCall(SIP_A,SIP_B,PRI2FXO_A) #good
+    #conferenceCall(SIP_A,SIP_B,PRI2FXO_A) #good
     #log.info('\n\n####RESULTS#####\n\n')
     #for result in RESULTS:
     #log.info(result) 
