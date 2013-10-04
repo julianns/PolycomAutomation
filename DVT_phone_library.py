@@ -124,7 +124,7 @@ SIP_300={pType:IP, name:"Damon Albarn(VVX300)", IP:"10.10.10.101", number:"55511
 #VVX310
 SIP_310={pType:IP, name:"Noel Gallagher(VVX310)", IP:"10.10.10.102", number:"5551112", alias:"1112", port:"0/2"}
 #VVX400
-SIP_400={pType:IP, name:"Maynard Keenan(VVX400)", IP:"10.10.10.103", number:"5551113", alias:"1113", port:"0/2"}
+SIP_400={pType:IP, name:"Maynard Keenan(VVX400)", IP:"10.10.10.103", number:"5551113", alias:"1113", port:"0/1"}
 #VVX410
 SIP_410={pType:IP, name:"Alex Turner(VVX410)", IP:"10.10.10.104", number:"5551114", alias:"1114", port:"0/1"}
 #VVX500
@@ -133,18 +133,23 @@ SIP_500={pType:IP, name:"Jay Kay(VVX500)", IP:"10.10.10.105", number:"5551115", 
 
 #Add Bulk Caller Phone Dictionaries
 BC_A={pType:BC, name:"John Bonham(Analog)", IP:False, number:"5551011", port:"0/7"}
-BC_B={pType:BC, name:"Bon Jonham(Analog)", IP:False, number:"5551011", port:"0/6"}
 
 #Add 
 PRI2FXO_A={pType:BC, name:"Phil Collins(PRI2Analog)", IP:False, number:"5581011", port:"0/8"}
-NEO2FXO_A={pType:BC, name:"Collin Phillips(NeoFXO2Analog)", IP:False, number:"5591011", port:"0/8"}
+#Calling Analog
+NEO2FXO_A={pType:BC, name:"Hey Phil Collins(NeoFXO2Analog)", IP:False, number:"5591011", port:"0/8"}
+NEO2FXO_B={pType:BC, name:"Be Phil Collins(NeoFXO2Analog)", IP:False, number:"5592011", port:"0/8"}
+NEO2FXO_C={pType:BC, name:"See Phil Collins(NeoFXO2Analog)", IP:False, number:"5593011", port:"0/8"}
+NEO2FXO_D={pType:BC, name:"The Phil Collins(NeoFXO2Analog)", IP:False, number:"5594011", port:"0/8"}
+NEO2FXO_E={pType:BC, name:"He Phil Collins(NeoFXO2Analog)", IP:False, number:"5595011", port:"0/8"}
+NEO2FXO_F={pType:BC, name:"And Phil Collins(NeoFXO2Analog)", IP:False, number:"5596011", port:"0/8"}
 
-NEOFXO_A={pType:IP, name:"Xiaojun(NeoFXO)", IP:"10.10.10.101", number:"5571011", port:"0/3"} 
-NEOFXO_B={pType:IP, name:"Ilin(NeoFXO)", IP:"10.10.10.102", number:"5571011", port:"0/3"} 
-NEOFXO_C={pType:IP, name:"Klokov(NeoFXO)", IP:"10.10.10.103", number:"5571011", port:"0/3"} 
-NEOFXO_D={pType:IP, name:"Dimas(NeoFXO)", IP:"10.10.10.104", number:"5571011", port:"0/3"} 
-NEOFXO_E={pType:IP, name:"Kolecki(NeoFXO)", IP:"10.10.10.105", number:"5571011", port:"0/3"} 
-NEOFXO_F={pType:IP, name:"Yong(NeoFXO)", IP:"10.10.10.106", number:"5571011", port:"0/3"} 
+NEO_01={pType:BC, name:"DA NEOFXO 0/1", IP:False, number:"5561011", port:"0/7"} 
+NEO_02={pType:BC, name:"NG NEOFXO 0/2", IP:False, number:"5562011", port:"0/7"} 
+NEO_03={pType:BC, name:"MK NEOFXO 0/3", IP:False, number:"5563011", port:"0/7"} 
+NEO_04={pType:BC, name:"AT NEOFXO 0/4", IP:False, number:"5564011", port:"0/7"} 
+NEO_05={pType:BC, name:"JK NEOFXO 0/5", IP:False, number:"5565011", port:"0/7"} 
+NEO_06={pType:BC, name:"JB NEOFXO 0/6", IP:False, number:"5566011", port:"0/7"} 
 
 
 
@@ -698,12 +703,19 @@ def initializeCall(A, B, callType, log, inHeadsetMode):
   if A[port]:
     initializePort(A[port])
 
-  #time.sleep(6)
+  time.sleep(6)
   call(A,B, inHeadsetMode)
   log.info('\n\ninitializing %s from %s to %s' %(callType, A[name], B[name]))
+  count = 0
   while not isRinging(B):
     time.sleep(1)
+    count += 1
+    if count == 25:
+      log.error('\nCall failed from %s to %s' %(A[name], B[name]))
+      RESULTS.append('\nCall failed from %s to %s' %(A[name], B[name]))
+      return False
   connect(B)
+  return True
 
 def normalCall(A, B):
   """
@@ -712,8 +724,8 @@ def normalCall(A, B):
   #logs results and hangs up
   """
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
-  initializeCall(A, B, 'normal call', log, False)
-  verifyCallPath(A, B, 'normal call')
+  if (initializeCall(A, B, 'normal call', log, False)):
+   verifyCallPath(A, B, 'normal call')
   disconnect(A)
   disconnect(B)
   
@@ -834,7 +846,7 @@ def test():
   Unit testing of automation script
   """
   initializeTest(BULK_CALLER, INFO)
-  for i in range(3):
+  for i in range(6):
     
   
 
@@ -844,17 +856,31 @@ def test():
     Completed unit tests down here
     """
     #disconnect(A[IP])
-    normalCall(SIP_300,NEOFXO2FXO)
+    normalCall(PRI2FXO_A,NEO_01) 
     time.sleep(10)
-    normalCall(SIP_310,NEOFXO2FXO)
+    normalCall(PRI2FXO_A,NEO_02)
     time.sleep(10)
-    #normalCall(SIP_410,NEOFXO2FXO) #good
-    #time.sleep(10)
-    #normalCall(SIP_400A,NEOFXO2FXO) #good
-    #time.sleep(10)
-		#normalCall(PRI2FXO_B,SIP_500) #good
-    #normalCall(PRI2FXO_B,SIP_300) #good
-    #normalCall(PRI2FXO_B,SIP_410)
+    normalCall(PRI2FXO_A,NEO_03) 
+    time.sleep(10)
+    normalCall(PRI2FXO_A,NEO_04)
+    time.sleep(10)
+    normalCall(PRI2FXO_A,NEO_05) 
+    time.sleep(10)
+    normalCall(PRI2FXO_A,NEO_06)
+    time.sleep(10)
+
+    normalCall(BC_A,NEO2FXO_A)
+    time.sleep(10)
+    normalCall(BC_A,NEO2FXO_B)
+    time.sleep(10)
+    normalCall(BC_A,NEO2FXO_C)
+    time.sleep(10)
+    normalCall(BC_A,NEO2FXO_D)
+    time.sleep(10)
+    normalCall(BC_A,NEO2FXO_E)
+    time.sleep(10)
+    normalCall(BC_A,NEO2FXO_F)
+    time.sleep(10)
     #attendedTransferCall(SIP_500,SIP_300,PRI2FXO_A)   #good 
     #unattendedTransferCall(SIP_400B,SIP_500,PRI2FXO_A) #good
     #blindTransferCall(SIP_300,SIP_400B,PRI2FXO_A) #good
