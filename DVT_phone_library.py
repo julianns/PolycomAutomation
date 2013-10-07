@@ -665,9 +665,16 @@ def verifyCallPath(A, B, callType):
   time.sleep(1)
   agood=False
   bgood=False
+  attempts=0
   while not (agood and bgood):
+    attempts+=1
     agood=isConnected(A)
     bgood=isConnected(B)
+    if attempts==20:
+     log.error("Unable to determine connection between %s and %s" %(A[name], B[name]))
+     RESULTS.append('Unable to verify connection from %s to %s in %s'%(B[name], A[name], callType))
+     RESULTS.append('Unable to verify connection from %s to %s in %s'%(A[name], B[name], callType))    
+     return
   if (agood and bgood):
     #crank up the headset volumes
     if A[pType]==IP:
@@ -846,7 +853,7 @@ def test():
   Unit testing of automation script
   """
   initializeTest(BULK_CALLER, INFO)
-  for i in range(2):
+  for i in range(1):
     
   
 
@@ -856,12 +863,21 @@ def test():
     Completed unit tests down here
     """
     #disconnect(A[IP])
-    unattendedTransferCall(SIP_310,SIP_400,SIP_500)
-    unattendedTransferCall(SIP_310,SIP_500,SIP_400)
-    unattendedTransferCall(SIP_400,SIP_310,SIP_500)
-    unattendedTransferCall(SIP_400,SIP_500,SIP_310)
-    unattendedTransferCall(SIP_500,SIP_310,SIP_400)
-    unattendedTransferCall(SIP_500,SIP_400,SIP_310)
+    #unattendedTransferCall(SIP_310,SIP_400,SIP_500)
+    #unattendedTransferCall(SIP_310,SIP_500,SIP_400)
+    #unattendedTransferCall(SIP_400,SIP_310,SIP_500)
+    #unattendedTransferCall(SIP_400,SIP_500,SIP_310)
+    #unattendedTransferCall(SIP_500,SIP_310,SIP_400)
+    #unattendedTransferCall(SIP_500,SIP_400,SIP_310)
+
+    normalCall(SIP_310,SIP_500)
+    normalCall(BC_A,SIP_400)
+    normalCall(SIP_400,BC_A)
+    normalCall(PRI2FXO_A,SIP_310)
+    normalCall(BC_A,PRI2FXO_A)
+    normalCall(SIP_310,NEO2FXO_A)
+    normalCall(PRI2FXO_A,NEO_06)
+    attendedTransfer(SIP_310,SIP_400,SIP_500)
 
     #unattendedTransferCall(SIP_400B,SIP_500,PRI2FXO_A) #good
     #blindTransferCall(SIP_300,SIP_400B,PRI2FXO_A) #good
