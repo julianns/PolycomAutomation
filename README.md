@@ -1,8 +1,8 @@
 PolycomAutomation
 =================
-For hardware testing, run DVT_Neo_Hardware_Test.py
+For Neo hardware testing, run DVT_Neo_Hardware_Test.py
 
-For software(phone calls) testing, run DVT_Neo_Phone_Calls_Test.py
+For Neo software(phone calls) testing, run DVT_Neo_Phone_Calls_Test.py
 
 
 Project to automate polycom phone wall and test beds
