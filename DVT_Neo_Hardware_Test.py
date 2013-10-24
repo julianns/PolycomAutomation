@@ -879,7 +879,7 @@ def finalizeTest():
     #~ log.info(result)
   log_file = open(log_filename)
   log_output = log_file.read()
-  result_file = open("Test_Results.log", 'w')
+  result_file = open("Test_Results_Hardware.log", 'w')
   result_file.write('#### TEST RESULTS #####\n\n')
   for result in RESULTS:
     result_file.write(result + '\n')
@@ -901,7 +901,7 @@ def testPinging(device):
     return False
   else :
     log.info("Pinging successful.\n")
-  return True
+    return True
 
 def setDoorRelay(setType, method, A):
 	if method == "CLI":
@@ -971,6 +971,13 @@ def passFailCheck(passed):
      return "PASS"
   else:
      return "FAIL"
+
+def saveConfig(config_name):
+  cmd=tn + NEO +'\n'
+  con.write(cmd)
+  login()
+  cmd="copy start %s.cfg"%(config_name)
+
 def test():
   """
   Unit testing of automation script
@@ -981,12 +988,12 @@ def test():
   open(log_filename, 'w').close()
   log.info("Neo Hardware Verification Test")
   RESULTS.append("Neo Hardware Verification Test")
-  runs = 1
+  runs = 0
 
 #Door Relay Testing
   initializeTest(NV6355, INFO, "NV6355 Telnet Connection")
-  log.info("DOOR RELAY VERIFICATION############################\n")
   for i in range(runs):
+    log.info("DOOR RELAY VERIFICATION############################\n")
     passed_doorRelA = testDoorRelay("CLI")
     passed_doorRelB = testDoorRelay("Dial-in",SIP_300)
     passed = passed_doorRelA and passed_doorRelB
@@ -1027,7 +1034,7 @@ def test():
     RESULTS.append("FXS 0/2 VERIFICATION------------------------%s"%(passFailCheck(passed)))
 
   #time.sleep(10)
-  for i in range(runs):
+  for i in range(3):
 		#~ #SIP to analog through T1/PRI 
     log.info("T1/PRI VERIFICATION##############################\n")
     passed_t1priA = normalCall(SIP_300,PRI2FXO_A)
@@ -1100,3 +1107,4 @@ atexit.register(finalizeTest)
 
 if __name__=="__main__":
   test()
+
