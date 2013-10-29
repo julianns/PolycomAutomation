@@ -95,6 +95,7 @@ PROMPT=""
 RESULTS=[]
 con=telnetlib.Telnet()
 con2=telnetlib.Telnet()
+neo_con=telnetlib.Telnet()
 
 
 #just so I can avoid quotes in all my keys
@@ -157,14 +158,18 @@ NEO_02={pType:IP, name:"VVX310 THROUGH FXO 0/2 T02", IP:"10.10.10.102", number:"
 NEO_03={pType:IP, name:"VVX400 through FXO 0/3 T03", IP:"10.10.10.103", number:"5563011", port:"0/3"} 
 NEO_04={pType:IP, name:"VVX410 THROUGH FXO 0/4 T04", IP:"10.10.10.104", number:"5564011", port:"0/4"} 
 NEO_05={pType:IP, name:"VVX500 THROUGH FXO 0/5 T05", IP:"10.10.10.105", number:"5565011", port:"0/5"} 
-#NEO_06={pType:IP, name:"VVX500 THROUGH FXO 0/6 T06", IP:"10.10.10.105", number:"5566011", port:"0/5"}
+#~ NEO_06={pType:IP, name:"VVX500 THROUGH FXO 0/6 T06", IP:"10.10.10.105", number:"5566011", port:"0/5"}
 NEO_06={pType:BC, name:"NEO ANALOG FXS 0/1 THROUGH FXO 0/6 T06", IP:False, number:"5566011", port:"0/7"}
 
 #Tuples of Phones
 SIP_LOCAL=(SIP_300,SIP_310,SIP_400,SIP_410,SIP_500)
+
 ANALOG_LOCAL=(BC_A, BC_B)
+
 LOCAL_PHONES=SIP_LOCAL+ANALOG_LOCAL
+
 ATLAS_ANALOG_NUM=(PRI2FXO_A, NEO2FXO_A, NEO2FXO_B, NEO2FXO_C, NEO2FXO_D, NEO2FXO_E, NEO2FXO_F)
+
 NEO_TRUNK_NUM=(NEO_01, NEO_02, NEO_03, NEO_04, NEO_05, NEO_06)
 
 #Ports and addresses
@@ -654,6 +659,8 @@ def verifyTalkPath(A, B, callType):
 
   while count<1.0:
     count +=1
+    BC2foundA=False
+    BC2foundB=False
     tonesA='333'
     tonesB='444'
     if B[pType]==BC:
@@ -777,7 +784,7 @@ def initializeCall(A, B, callType, log, inHeadsetMode):
     time.sleep(1)
     count += 1
     if count == 20:
-      log.error('Call failed from %s to %s\n' %(A[name], B[name]))
+      log.error('Call failed from %s to %s' %(A[name], B[name]))
       #RESULTS.append('Call failed from %s to %s' %(A[name], B[name]))
       return False
   connect(B)
@@ -793,11 +800,12 @@ def normalCall(A, B, callID=False):
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if (initializeCall(A, B, 'normal call', log, False)):
     if callID==True:
-      passed = callerIDtest(B)
+      passed = callerIDtest(A, B)
     else:
       passed = verifyCallPath(A, B, 'normal call')
   else:
     passed = False
+  time.sleep(1)
   disconnect(A)
   disconnect(B)
   return passed
@@ -826,9 +834,10 @@ def conferenceCall(A, B, C):
       passed = False
   else:
     passed = False
-  disconnect(A)
-  disconnect(B)
+  time.sleep(1)
   disconnect(C)
+  disconnect(B)
+  disconnect(A)
   return passed
   
 def attendedTransferCall(A, B, C):
@@ -849,8 +858,10 @@ def attendedTransferCall(A, B, C):
     passed = verifyCallPath(C, B, 'attended transfer call leg BC')
   else :
     passed = False
-  disconnect(B)
+  time.sleep(1)
   disconnect(C)
+  disconnect(B)
+  disconnect(A)
   return passed
   
 def unattendedTransferCall(A, B, C):
@@ -870,8 +881,10 @@ def unattendedTransferCall(A, B, C):
     passed = verifyCallPath(C, B, 'unattended transfer call leg BC')
   else :
     passed = False
-  disconnect(B)
+  time.sleep(1)
   disconnect(C)
+  disconnect(B)
+  disconnect(A)
   return passed
   
 def blindTransferCall(A, B, C):
@@ -890,8 +903,10 @@ def blindTransferCall(A, B, C):
     passed = verifyCallPath(C, B, 'blind transfer call leg BC')
   else :
     passed = False
-  disconnect(B)
+  time.sleep(1)
   disconnect(C)
+  disconnect(B)
+  disconnect(A)
   return passed
   
 def setupLogging(level):
@@ -905,14 +920,21 @@ def setupLogging(level):
   requests_log = logging.getLogger("requests")
   requests_log.setLevel(logging.WARNING)
 
-def callerIDtest(A):
-  state = sendPoll(A)
-  passed=True
-  caller=(state["CallingPartyName"])
-  callerNum=(state["CallingPartyDirNum"])
-  log.info("Calling Party: %s - %s"%(caller, callerNum))
-  if (callerNum.find("Unknown")+1):
-    passed=False
+def callerIDtest(A,B):
+  try:
+    state = sendPoll(B)
+    passed=True
+    caller=(state["CallingPartyName"])
+    callerNum=(state["CallingPartyDirNum"])
+    log.info("Calling Party: %s - %s"%(caller, callerNum))
+    if not(callerNum.find(A[number])+1):
+      log.error("Incorrect phone number in Caller ID")
+      passed=False
+    else:
+      log.info("Correct phone number in Caller ID")
+  except:
+    log.warn('No headers returned from poll')
+    pass
   return passed
    
 def initializeTest(ipA, ipB, level, testType):
@@ -923,6 +945,7 @@ def initializeTest(ipA, ipB, level, testType):
   global PROMPT
   global con
   global con2
+  global neo_con
   con=telnet(ipA) # telnet to first bulk caller
   #~ setupLogging(level)
   log.info('\n\nCreating %s...\n' %(testType))
@@ -938,9 +961,13 @@ def initializeTest(ipA, ipB, level, testType):
     log.error("No connection to device")
     exit()
   PROMPT=login(con2)
-  for i in ('0'):
+  for i in ('0 at BC2'):
     port="0/"+i
     initializePort(port)
+  neo_con=telnet(ipB) # telnet to second bulk caller through first bulk caller's  CLI
+  if neo_con==-1:
+    log.error("No connection to device")
+    exit()
   
 def finalizeTest():
   log.info('\n\n#### TEST RESULTS #####\n\n')
@@ -957,11 +984,19 @@ def finalizeTest():
   log_file.close()
   result_file.close()
 
+def shutNoShutFxo(port):
+  neo_con.write("configure terminal\n")
+  neo_con.write("interface fxo " + port + '\n')
+  neo_con.write("shutdown\n")
+  time.sleep(1)
+  neo_con.write("no shutdown\n")
+  neo_con.write("exit\n")
+
 def passFailCheck(passed):
   if passed:
      return "PASS"
   else:
-     return "FAIL"
+     return "FAIL***"
 
 def test():
   """
@@ -976,138 +1011,248 @@ def test():
   RESULTS.append("Neo Phone Calls Verification Test")
 
 #Phone Calls Testing
-  initializeTest(BULK_CALLER, BULK_CALLER_2, INFO, "Neo Telnet Connection")
-  for i in range(runs):
-    log.info("CALLER ID VERIFICATION#################################")
+  initializeTest(BULK_CALLER, BULK_CALLER_2, INFO, "Telnet Connections")
+  RESULTS.append("\nCALLER ID")
+  for i in range(0):
+    log.info("CALLER ID VERIFICATION####################################################")
     passed = normalCall(SIP_500,SIP_300, True)
+    RESULTS.append("  CALLER ID SIP LOCAL CALLER VERIFICATION-----------------------------%s"%(passFailCheck(passed)))
     passed = normalCall(NV7100_SIP_400,SIP_310, True)
+    RESULTS.append("  CALLER ID SIP TRUNK CALLER VERIFICATION-----------------------------%s"%(passFailCheck(passed)))
     passed = normalCall(PRI2FXO_A,SIP_400, True)
+    RESULTS.append("  CALLER ID T1/PRI CALLER VERIFICATION--------------------------------%s"%(passFailCheck(passed)))
     passed = normalCall(PRI2FXO_A,NEO_04, True)
-    RESULTS.append("CALLER ID VERIFICATION----------------------------%s"%(passFailCheck(passed)))
+    RESULTS.append("  CALLER ID FXO VERIFICATION------------------------------------------%s"%(passFailCheck(passed)))
+    log.info("CALLER ID VERIFICATION COMPLETE\n")
 
-  for i in range(runs):
-    log.info("NORMAL CALL LOCAL SIP-SIP VERIFICATION#################################")
-    passed = normalCall(SIP_300,SIP_310)
-    RESULTS.append("NORMAL CALL LOCAL SIP-SIP VERIFICATION----------------------------%s"%(passFailCheck(passed)))
 
+  RESULTS.append("BASIC CALLS")
   for i in range(runs):
-    log.info("NORMAL CALL LOCAL SIP-ANALOG VERIFICATION#############################")
+    log.info("NORMAL CALL LOCAL SIP-SIP VERIFICATION####################################")
+    passedA = normalCall(SIP_300,SIP_310)
+    passedB = normalCall(SIP_310,SIP_400)
+    passedC = normalCall(SIP_400,SIP_410)
+    passed = passedA and passedB and passedC
+    RESULTS.append("    NORMAL CALL LOCAL SIP-SIP VERIFICATION----------------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("NORMAL CALL LOCAL SIP-ANALOG VERIFICATION#################################")
     passedA = normalCall(SIP_400,BC_A)
     passedB = normalCall(BC_B,SIP_410)
     passed = passedA and passedB
-    RESULTS.append("NORMAL CALL LOCAL SIP-ANALOG VERIFICATION------------------------%s"%(passFailCheck(passed)))
-
+    RESULTS.append("    NORMAL CALL LOCAL SIP-ANALOG VERIFICATION-------------------------%s"%(passFailCheck(passed)))
   for i in range(runs):
-    log.info("NORMAL CALL THROUGH SIP TRUNK VERIFICATION##############################\n")
+    log.info("NORMAL CALL THROUGH SIP TRUNK VERIFICATION################################")
     passedA = normalCall(SIP_500,NV7100_SIP_400)
     passedB = normalCall(NV7100_SIP_400,SIP_300)
     passed = passedA and passedB
-    RESULTS.append("NORMAL CALL THROUGH SIP TRUNK VERIFICATION-------------------------%s"%(passFailCheck(passed)))
-
+    RESULTS.append("    NORMAL CALL THROUGH SIP TRUNK VERIFICATION------------------------%s"%(passFailCheck(passed)))
   for i in range(runs):
-    log.info("NORMAL CALL THROUGH T1/PRI VERIFICATION#############################")
+    log.info("NORMAL CALL THROUGH T1/PRI VERIFICATION###################################")
     passedA = normalCall(SIP_500,PRI2FXO_A)
     passedB = normalCall(PRI2FXO_A,SIP_300)
     passed = passedA and passedB
-    RESULTS.append("NORMAL CALL LOCAL THROUGH T1/PRI VERIFICATION------------------------%s"%(passFailCheck(passed)))
-
-  #time.sleep(10)
+    RESULTS.append("    NORMAL CALL LOCAL THROUGH T1/PRI VERIFICATION---------------------%s"%(passFailCheck(passed)))
   for i in range(runs):
-    log.info("NORMAL CALL THROUGH FXO PORTS OUTBOUND CALL VERIFICATION##############################\n")
-    for j in ATLAS_ANALOG_NUM:
-      passed += int(not(normalCall(SIP_310,j)))
-    RESULTS.append("NORMAL CALL THROUGH FXO PORTS OUTBOUND CALL VERIFICATION-------------------------%s"%(passFailCheck(passed)))
-
+    log.info("NORMAL CALL THROUGH FXO 0/1 CALL VERIFICATION#############################")
+    passedA = normalCall(SIP_300,NEO2FXO_A)
+    passedB = normalCall(PRI2FXO_A,NEO_01)
+    passed = passedA and passedB
+    RESULTS.append("    NORMAL CALL THROUGH FXO 0/1 CALL VERIFICATION---------------------%s"%(passFailCheck(passed)))
   for i in range(runs):
-    log.info("NORMAL CALL THROUGH FXO PORTS INBOUND CALL VERIFICATION##############################\n")
-    for j in NEO_TRUNK_NUM:
-      passed += int(not(normalCall(PRI2FXO_A,j)))
-    RESULTS.append("NORMAL CALL THROUGH FXO PORTS INBOUND CALL VERIFICATION-------------------------%s"%(passFailCheck(passed)))
+    log.info("NORMAL CALL THROUGH FXO 0/2 CALL VERIFICATION#############################")
+    passedA = normalCall(SIP_310,NEO2FXO_B)
+    passedB = normalCall(PRI2FXO_A,NEO_02)
+    passed = passedA and passedB
+    RESULTS.append("    NORMAL CALL THROUGH FXO 0/2 CALL VERIFICATION---------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("NORMAL CALL THROUGH FXO 0/3 CALL VERIFICATION#############################")
+    passedA = normalCall(SIP_400,NEO2FXO_C)
+    passedB = normalCall(PRI2FXO_A,NEO_03)
+    passed = passedA and passedB
+    RESULTS.append("    NORMAL CALL THROUGH FXO 0/3 CALL VERIFICATION---------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("NORMAL CALL THROUGH FXO 0/4 CALL VERIFICATION#############################")
+    passedA = normalCall(SIP_410,NEO2FXO_D)
+    passedB = normalCall(PRI2FXO_A,NEO_04)
+    passed = passedA and passedB
+    RESULTS.append("    NORMAL CALL THROUGH FXO 0/4 CALL VERIFICATION---------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("NORMAL CALL THROUGH FXO 0/5 CALL VERIFICATION#############################")
+    passedA = normalCall(SIP_500,NEO2FXO_E)
+    passedB = normalCall(PRI2FXO_A,NEO_05)
+    passed = passedA and passedB
+    RESULTS.append("    NORMAL CALL THROUGH FXO 0/5 CALL VERIFICATION---------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("NORMAL CALL THROUGH FXO 0/6 CALL VERIFICATION#############################")
+    passedA = normalCall(BC_A,NEO2FXO_F)
+    passedB = normalCall(PRI2FXO_A,NEO_06)
+    passed = passedA and passedB
+    RESULTS.append("    NORMAL CALL THROUGH FXO 0/6 CALL VERIFICATION---------------------%s"%(passFailCheck(passed)))
 
+  for i in ('0 at BC2','1','2','3','4','5','6','7','8'):
+    port="0/"+i
+    initializePort(port)
+
+  RESULTS.append("\nCALL TRANSFERS")
+  RESULTS.append("  ATTENDED TRANSFERS")
   for i in range(runs):
     log.info("ATTENDED CALL TRANSFER LOCAL VERIFICATION#################################")
     passed = attendedTransferCall(SIP_400,SIP_410,SIP_500)
-    RESULTS.append("ATTENDED CALL TRANSFER LOCAL VERIFICATION----------------------------%s"%(passFailCheck(passed)))
-
+    RESULTS.append("    ATTENDED CALL TRANSFER LOCAL VERIFICATION-------------------------%s"%(passFailCheck(passed)))
   for i in range(runs):
-    log.info("ATTENDED CALL TRANSFER SIP TRUNK VERIFICATION#################################")
+    log.info("ATTENDED CALL TRANSFER SIP TRUNK VERIFICATION#############################")
     passed = attendedTransferCall(SIP_300,NV7100_SIP_400,SIP_400)
-    RESULTS.append("ATTENDED CALL TRANSFER SIP TRUNK VERIFICATION----------------------------%s"%(passFailCheck(passed)))
-
+    RESULTS.append("    ATTENDED CALL TRANSFER SIP TRUNK VERIFICATION---------------------%s"%(passFailCheck(passed)))
   for i in range(runs):
-    log.info("ATTENDED CALL TRANSFER T1/PRI VERIFICATION#################################")
+    log.info("ATTENDED CALL TRANSFER T1/PRI VERIFICATION################################")
     passed = attendedTransferCall(SIP_300,PRI2FXO_A,SIP_310)
-    RESULTS.append("ATTENDED CALL TRANSFER T1/PRI VERIFICATION----------------------------%s"%(passFailCheck(passed)))
-
+    RESULTS.append("    ATTENDED CALL TRANSFER T1/PRI VERIFICATION------------------------%s"%(passFailCheck(passed)))
   for i in range(runs):
-    log.info("ATTENDED CALL TRANSFER FXO VERIFICATION#################################")
-    for j in ATLAS_ANALOG_NUM:
-      passed += int(not(attendedTransferCall(SIP_400,j,SIP_410)))
-    RESULTS.append("ATTENDED CALL TRANSFER FXO VERIFICATION----------------------------%s"%(passFailCheck(passed)))
+    log.info("ATTENDED CALL TRANSFER FXO 0/1 VERIFICATION###############################")
+    passed = attendedTransferCall(SIP_400,NEO2FXO_A,SIP_410)
+    RESULTS.append("    ATTENDED CALL TRANSFER FXO 0/1 CALL VERIFICATION------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("ATTENDED CALL TRANSFER FXO 0/2 VERIFICATION###############################")
+    passed = attendedTransferCall(SIP_400,NEO2FXO_B,SIP_410)
+    RESULTS.append("    ATTENDED CALL TRANSFER FXO 0/2 CALL VERIFICATION------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("ATTENDED CALL TRANSFER FXO 0/3 VERIFICATION###############################")
+    passed = attendedTransferCall(SIP_400,NEO2FXO_C,SIP_410)
+    RESULTS.append("    ATTENDED CALL TRANSFER FXO 0/3 CALL VERIFICATION------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("ATTENDED CALL TRANSFER FXO 0/4 VERIFICATION###############################")
+    passed = attendedTransferCall(SIP_400,NEO2FXO_D,SIP_410)
+    RESULTS.append("    ATTENDED CALL TRANSFER FXO 0/4 CALL VERIFICATION------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("ATTENDED CALL TRANSFER FXO 0/5 VERIFICATION###############################")
+    passed = attendedTransferCall(SIP_400,NEO2FXO_E,SIP_410)
+    RESULTS.append("    ATTENDED CALL TRANSFER FXO 0/5 CALL VERIFICATION------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("ATTENDED CALL TRANSFER FXO 0/6 VERIFICATION###############################")
+    passed = attendedTransferCall(SIP_400,NEO2FXO_F,SIP_410)
+    RESULTS.append("    ATTENDED CALL TRANSFER FXO 0/6 CALL VERIFICATION------------------%s"%(passFailCheck(passed)))
 
-#CAUSES NEO TO REBOOT
-  #~ for i in range(runs):
-    #~ log.info("UNATTENDED CALL TRANSFER LOCAL VERIFICATION#################################")
-    #~ passed = unattendedTransferCall(SIP_400,SIP_410,SIP_500)
-    #~ RESULTS.append("UNATTENDED CALL TRANSFER LOCAL VERIFICATION----------------------------%s"%(passFailCheck(passed)))
+  RESULTS.append("  UNATTENDED TRANSFERS")
+  for i in range(runs):
+    log.info("UNATTENDED CALL TRANSFER LOCAL VERIFICATION###############################")
+    passed = unattendedTransferCall(SIP_400,SIP_410,SIP_500)
+    RESULTS.append("    UNATTENDED CALL TRANSFER LOCAL VERIFICATION-----------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("UNATTENDED CALL TRANSFER SIP TRUNK VERIFICATION###########################")
+    passed = unattendedTransferCall(SIP_300,NV7100_SIP_400,SIP_310)
+    RESULTS.append("    UNATTENDED CALL TRANSFER SIP TRUNK VERIFICATION-------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("UNATTENDED CALL TRANSFER T1/PRI VERIFICATION##############################")
+    passed = unattendedTransferCall(SIP_300,PRI2FXO_A,SIP_310)
+    RESULTS.append("    UNATTENDED CALL TRANSFER T1/PRI VERIFICATION----------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("UNATTENDED CALL TRANSFER FXO 0/1 VERIFICATION#############################")
+    passed = unattendedTransferCall(SIP_400,NEO2FXO_A,SIP_410)
+    RESULTS.append("    UNATTENDED CALL TRANSFER FXO 0/1 CALL VERIFICATION----------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("UNATTENDED CALL TRANSFER FXO 0/2 VERIFICATION#############################")
+    #~ passed = unattendedTransferCall(SIP_400,NEO2FXO_B,SIP_410)
+    RESULTS.append("    UNATTENDED CALL TRANSFER FXO 0/2 CALL VERIFICATION----------------%sAOS-11557"%(passFailCheck(False)))
+  for i in range(runs):
+    log.info("UNATTENDED CALL TRANSFER FXO 0/3 VERIFICATION#############################")
+    #~ passed = unattendedTransferCall(SIP_400,NEO2FXO_C,SIP_410)
+    RESULTS.append("    UNATTENDED CALL TRANSFER FXO 0/3 CALL VERIFICATION----------------%sAOS-11557"%(passFailCheck(False)))
+  for i in range(runs):
+    log.info("UNATTENDED CALL TRANSFER FXO 0/4 VERIFICATION#############################")
+    #~ passed = unattendedTransferCall(SIP_400,NEO2FXO_D,SIP_410)
+    RESULTS.append("    UNATTENDED CALL TRANSFER FXO 0/4 CALL VERIFICATION----------------%sAOS-11557"%(passFailCheck(False)))
+  for i in range(runs):
+    log.info("UNATTENDED CALL TRANSFER FXO 0/5 VERIFICATION#############################")
+    #~ passed = unattendedTransferCall(SIP_400,NEO2FXO_E,SIP_410)
+    RESULTS.append("    UNATTENDED CALL TRANSFER FXO 0/5 CALL VERIFICATION----------------%sAOS-11557"%(passFailCheck(False)))
+  for i in range(runs):
+    log.info("UNATTENDED CALL TRANSFER FXO 0/6 VERIFICATION#############################")
+    #~ passed = unattendedTransferCall(SIP_400,NEO2FXO_F,SIP_410)
+    RESULTS.append("    UNATTENDED CALL TRANSFER FXO 0/6 CALL VERIFICATION----------------%sAOS-11557"%(passFailCheck(False)))
 
-  #~ for i in range(runs):
-    #~ log.info("UNATTENDED CALL TRANSFER SIP TRUNK VERIFICATION#################################")
-    #~ passed = unattendedTransferCall(SIP_300,NV7100_SIP_400,SIP_310)
-    #~ RESULTS.append("UNATTENDED CALL TRANSFER SIP TRUNK VERIFICATION----------------------------%s"%(passFailCheck(passed)))
-#~ 
-  #~ for i in range(runs):
-    #~ log.info("UNATTENDED CALL TRANSFER T1/PRI VERIFICATION#################################")
-    #~ passed = unattendedTransferCall(SIP_300,PRI2FXO_A,SIP_310)
-    #~ RESULTS.append("UNATTENDED CALL TRANSFER T1/PRI VERIFICATION----------------------------%s"%(passFailCheck(passed)))
-#~ 
-  #~ for i in range(runs):
-    #~ log.info("UNATTENDED CALL TRANSFER FXO VERIFICATION#################################")
-    #~ for j in ATLAS_ANALOG_NUM:
-      #~ passed += int(not(unattendedTransferCall(SIP_400,j,SIP_410)))
-    #~ RESULTS.append("UNATTENDED CALL TRANSFER FXO VERIFICATION----------------------------%s"%(passFailCheck(passed)))
-#~ 
-  #~ for i in range(runs):
-    #~ log.info("BLIND CALL TRANSFER LOCAL VERIFICATION#################################")
-    #~ passed = blindTransferCall(SIP_400,SIP_410,SIP_500)
-    #~ RESULTS.append("BLIND CALL TRANSFER LOCAL VERIFICATION----------------------------%s"%(passFailCheck(passed)))
-#~ 
-  #~ for i in range(runs):
-    #~ log.info("BLIND CALL TRANSFER SIP TRUNK VERIFICATION#################################")
-    #~ passed = blindTransferCall(SIP_300,NV7100_SIP_400,SIP_310)
-    #~ RESULTS.append("BLIND CALL TRANSFER SIP TRUNK VERIFICATION----------------------------%s"%(passFailCheck(passed)))
-#~ 
-  #~ for i in range(runs):
-    #~ log.info("BLIND CALL TRANSFER T1/PRI VERIFICATION#################################")
-    #~ passed = blindTransferCall(SIP_300,PRI2FXO_A,SIP_310)
-    #~ RESULTS.append("BLIND CALL TRANSFER T1/PRI VERIFICATION----------------------------%s"%(passFailCheck(passed)))
-#~ 
-  #~ for i in range(runs):
-    #~ log.info("BLIND CALL TRANSFER FXO VERIFICATION#################################")
-    #~ for j in ATLAS_ANALOG_NUM:
-      #~ passed += int(not(blindTransferCall(SIP_400,j,SIP_410)))
-    #~ RESULTS.append("BLIND CALL TRANSFER FXO VERIFICATION----------------------------%s"%(passFailCheck(passed)))
-#~ 
-  #~ for i in range(runs):
-    #~ log.info("CONFERENCE CALL LOCAL VERIFICATION#################################")
-    #~ passed = conferenceCall(SIP_400,SIP_410,SIP_500)
-    #~ RESULTS.append("CONFERENCE CALL LOCAL VERIFICATION----------------------------%s"%(passFailCheck(passed)))
-#~ 
-  #~ for i in range(runs):
-    #~ log.info("CONFERENCE CALL SIP TRUNK VERIFICATION#################################")
-    #~ passed = conferenceCall(SIP_300,NV7100_SIP_400,SIP_310)
-    #~ RESULTS.append("CONFERENCE CALL SIP TRUNK VERIFICATION----------------------------%s"%(passFailCheck(passed)))
-#~ 
-  #~ for i in range(runs):
-    #~ log.info("CONFERENCE CALL T1/PRI VERIFICATION#################################")
-    #~ passed = conferenceCall(SIP_300,PRI2FXO_A,SIP_310)
-    #~ RESULTS.append("CONFERENCE CALL T1/PRI VERIFICATION----------------------------%s"%(passFailCheck(passed)))
-#~ 
-  #~ for i in range(runs):
-    #~ log.info("CONFERENCE CALL FXO VERIFICATION#################################")
-    #~ for j in ATLAS_ANALOG_NUM:
-      #~ passed += int(not(conferenceCall(SIP_400,j,SIP_410)))
-    #~ RESULTS.append("CONFERENCE CALL FXO VERIFICATION----------------------------%s"%(passFailCheck(passed)))
+  RESULTS.append("  BLIND TRANSFERS")
+  for i in range(runs):
+    log.info("BLIND CALL TRANSFER LOCAL VERIFICATION####################################")
+    passed = blindTransferCall(SIP_400,SIP_410,SIP_500)
+    RESULTS.append("    BLIND CALL TRANSFER LOCAL VERIFICATION----------------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("BLIND CALL TRANSFER SIP TRUNK VERIFICATION################################")
+    passed = blindTransferCall(SIP_300,NV7100_SIP_400,SIP_310)
+    RESULTS.append("    BLIND CALL TRANSFER SIP TRUNK VERIFICATION------------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("BLIND CALL TRANSFER T1/PRI VERIFICATION###################################")
+    passed = blindTransferCall(SIP_300,PRI2FXO_A,SIP_310)
+    RESULTS.append("    BLIND CALL TRANSFER T1/PRI VERIFICATION---------------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("BLIND CALL TRANSFER FXO 0/1 VERIFICATION##################################")
+    passed = blindTransferCall(SIP_400,NEO2FXO_A,SIP_410)
+    RESULTS.append("    BLIND CALL TRANSFER FXO 0/1 CALL VERIFICATION---------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("BLIND CALL TRANSFER FXO 0/2 VERIFICATION##################################")
+    #~ passed = blindTransferCall(SIP_400,NEO2FXO_B,SIP_410)
+    RESULTS.append("    BLIND CALL TRANSFER FXO 0/2 CALL VERIFICATION---------------------%sAOS-11557"%(passFailCheck(False)))
+  for i in range(runs):
+    log.info("BLIND CALL TRANSFER FXO 0/3 VERIFICATION##################################")
+    #~ passed = blindTransferCall(SIP_400,NEO2FXO_C,SIP_410)
+    RESULTS.append("    BLIND CALL TRANSFER FXO 0/3 CALL VERIFICATION---------------------%sAOS-11557"%(passFailCheck(False)))
+  for i in range(runs):
+    log.info("BLIND CALL TRANSFER FXO 0/4 VERIFICATION##################################")
+    #~ passed = blindTransferCall(SIP_400,NEO2FXO_D,SIP_410)
+    RESULTS.append("    BLIND CALL TRANSFER FXO 0/4 CALL VERIFICATION---------------------%sAOS-11557"%(passFailCheck(False)))
+  for i in range(runs):
+    log.info("BLIND CALL TRANSFER FXO 0/5 VERIFICATION##################################")
+    #~ passed = blindTransferCall(SIP_400,NEO2FXO_E,SIP_410)
+    RESULTS.append("    BLIND CALL TRANSFER FXO 0/5 CALL VERIFICATION---------------------%sAOS-11557"%(passFailCheck(False)))
+  for i in range(runs):
+    log.info("BLIND CALL TRANSFER FXO 0/6 VERIFICATION##################################")
+    #~ passed = blindTransferCall(SIP_400,NEO2FXO_F,SIP_410)
+    RESULTS.append("    BLIND CALL TRANSFER FXO 0/6 CALL VERIFICATION---------------------%sAOS-11557"%(passFailCheck(False)))
+
+  RESULTS.append("\nCONFERENCE CALLS")
+  for i in range(runs):
+    log.info("CONFERENCE CALL LOCAL VERIFICATION########################################")
+    passed = conferenceCall(SIP_300,SIP_310,SIP_500)
+    RESULTS.append("    CONFERENCE CALL LOCAL VERIFICATION--------------------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("CONFERENCE CALL SIP TRUNK VERIFICATION####################################")
+    passed = conferenceCall(SIP_300,NV7100_SIP_400,SIP_310)
+    RESULTS.append("    CONFERENCE CALL SIP TRUNK VERIFICATION----------------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("CONFERENCE CALL T1/PRI VERIFICATION#######################################")
+    passed = conferenceCall(SIP_500,PRI2FXO_A,SIP_300)
+    RESULTS.append("    CONFERENCE CALL T1/PRI VERIFICATION-------------------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("CONFERENCE CALL FXO 0/1 VERIFICATION######################################")
+    passed = conferenceCall(SIP_300,NEO2FXO_A,SIP_500)
+    RESULTS.append("    CONFERENCE CALL FXO 0/1 VERIFICATION------------------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("CONFERENCE CALL FXO 0/2 VERIFICATION######################################")
+    passed = conferenceCall(SIP_310,NEO2FXO_B,SIP_410)
+    RESULTS.append("    CONFERENCE CALL FXO 0/2 VERIFICATION------------------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("CONFERENCE CALL FXO 0/3 VERIFICATION######################################")
+    passed = conferenceCall(SIP_400,NEO2FXO_C,SIP_310)
+    RESULTS.append("    CONFERENCE CALL FXO 0/3 VERIFICATION------------------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("CONFERENCE CALL FXO 0/4 VERIFICATION######################################")
+    passed = conferenceCall(SIP_500,NEO2FXO_D,SIP_310)
+    RESULTS.append("    CONFERENCE CALL FXO 0/4 VERIFICATION------------------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("CONFERENCE CALL FXO 0/5 VERIFICATION######################################")
+    passed = conferenceCall(SIP_500,NEO2FXO_E,SIP_310)
+    RESULTS.append("    CONFERENCE CALL FXO 0/5 VERIFICATION------------------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("CONFERENCE CALL FXO 0/6 VERIFICATION######################################")
+    passed = conferenceCall(SIP_310,NEO2FXO_F,SIP_500)
+    RESULTS.append("    CONFERENCE CALL FXO 0/6 VERIFICATION------------------------------%s"%(passFailCheck(passed)))
+
+  RESULTS.append("\nVOICEMAIL(TBD)")
+
+  RESULTS.append("\nAUTO-ATTENDANT(TBD)")
+
+  RESULTS.append("\nRING GROUP(TBD)")
+
+
 atexit.register(finalizeTest)
 
 if __name__=="__main__":
