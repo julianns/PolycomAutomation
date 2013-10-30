@@ -172,6 +172,8 @@ ATLAS_ANALOG_NUM=(PRI2FXO_A, NEO2FXO_A, NEO2FXO_B, NEO2FXO_C, NEO2FXO_D, NEO2FXO
 
 NEO_TRUNK_NUM=(NEO_01, NEO_02, NEO_03, NEO_04, NEO_05, NEO_06)
 
+BC_PORTS=('0/0 at BC2','0/1','0/2','0/3','0/4','0/5','0/6','0/7','0/8')
+
 #Ports and addresses
 DoorRelayPort="0/24" #NV6355 Port
 
@@ -661,8 +663,8 @@ def verifyTalkPath(A, B, callType):
     count +=1
     BC2foundA=False
     BC2foundB=False
-    tonesA='333'
-    tonesB='444'
+    tonesA='333333'
+    tonesB='444444'
     if B[pType]==BC:
       listenForTones(A[port], time=12000)
     else:
@@ -953,21 +955,18 @@ def initializeTest(ipA, ipB, level, testType):
     log.error("No connection to device")
     exit()
   PROMPT=login(con)
-  for i in ('1','2','3','4','5','6','7','8'):
-    port="0/"+i
-    initializePort(port)
   con2=telnet(ipB) # telnet to second bulk caller through first bulk caller's  CLI
   if con2==-1:
     log.error("No connection to device")
     exit()
   PROMPT=login(con2)
-  for i in ('0 at BC2'):
-    port="0/"+i
-    initializePort(port)
   neo_con=telnet(ipB) # telnet to second bulk caller through first bulk caller's  CLI
   if neo_con==-1:
     log.error("No connection to device")
     exit()
+  log.info("Initializing Ports...")
+  for i in BC_PORTS:
+    initializePort(i)
   
 def finalizeTest():
   log.info('\n\n#### TEST RESULTS #####\n\n')
@@ -1089,9 +1088,9 @@ def test():
     passed = passedA and passedB
     RESULTS.append("    NORMAL CALL THROUGH FXO 0/6 CALL VERIFICATION---------------------%s"%(passFailCheck(passed)))
 
-  for i in ('0 at BC2','1','2','3','4','5','6','7','8'):
-    port="0/"+i
-    initializePort(port)
+  log.info("Re-initializing Ports...")
+  for i in BC_PORTS:
+    initializePort(i)
 
   RESULTS.append("\nCALL TRANSFERS")
   RESULTS.append("  ATTENDED TRANSFERS")
@@ -1132,6 +1131,10 @@ def test():
     passed = attendedTransferCall(SIP_400,NEO2FXO_F,SIP_410)
     RESULTS.append("    ATTENDED CALL TRANSFER FXO 0/6 CALL VERIFICATION------------------%s"%(passFailCheck(passed)))
 
+  log.info("Re-initializing Ports...")
+  for i in BC_PORTS:
+    initializePort(i)
+
   RESULTS.append("  UNATTENDED TRANSFERS")
   for i in range(runs):
     log.info("UNATTENDED CALL TRANSFER LOCAL VERIFICATION###############################")
@@ -1169,6 +1172,10 @@ def test():
     log.info("UNATTENDED CALL TRANSFER FXO 0/6 VERIFICATION#############################")
     #~ passed = unattendedTransferCall(SIP_400,NEO2FXO_F,SIP_410)
     RESULTS.append("    UNATTENDED CALL TRANSFER FXO 0/6 CALL VERIFICATION----------------%sAOS-11557"%(passFailCheck(False)))
+
+  log.info("Re-initializing Ports...")
+  for i in BC_PORTS:
+    initializePort(i)
 
   RESULTS.append("  BLIND TRANSFERS")
   for i in range(runs):
@@ -1208,6 +1215,11 @@ def test():
     #~ passed = blindTransferCall(SIP_400,NEO2FXO_F,SIP_410)
     RESULTS.append("    BLIND CALL TRANSFER FXO 0/6 CALL VERIFICATION---------------------%sAOS-11557"%(passFailCheck(False)))
 
+
+  log.info("Re-initializing Ports...")
+  for i in BC_PORTS:
+    initializePort(i)
+
   RESULTS.append("\nCONFERENCE CALLS")
   for i in range(runs):
     log.info("CONFERENCE CALL LOCAL VERIFICATION########################################")
@@ -1239,7 +1251,7 @@ def test():
     RESULTS.append("    CONFERENCE CALL FXO 0/4 VERIFICATION------------------------------%s"%(passFailCheck(passed)))
   for i in range(runs):
     log.info("CONFERENCE CALL FXO 0/5 VERIFICATION######################################")
-    passed = conferenceCall(SIP_500,NEO2FXO_E,SIP_310)
+    passed = conferenceCall(SIP_410,NEO2FXO_E,SIP_310)
     RESULTS.append("    CONFERENCE CALL FXO 0/5 VERIFICATION------------------------------%s"%(passFailCheck(passed)))
   for i in range(runs):
     log.info("CONFERENCE CALL FXO 0/6 VERIFICATION######################################")
