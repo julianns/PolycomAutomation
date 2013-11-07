@@ -80,7 +80,7 @@ except Exception:
 
 
 #Set globals
-username, password, enable = 'adtran\n', 'adtran\n', 'adtran\n'
+username, password, enable = 'adtran\n', 'adtran\n', 'adtran\n' #Login credentials
 USER='Push'
 PWD='Push'
 AUTH=digest(USER, PWD)
@@ -93,12 +93,6 @@ PAYLOAD_B="</Data></PolycomIPPhone>"
 BC_RESPONSE=re.compile(r".*fxo\s(.*) - 0x(\d+)\s\((.*)\)\s\((.*)\).*\((.*)\)")
 PROMPT=""
 RESULTS=[]
-con=telnetlib.Telnet()
-con2=telnetlib.Telnet()
-neo_con=telnetlib.Telnet()
-
-
-#just so I can avoid quotes in all my keys
 pType="pYtpe"
 BC="BC"
 name="name"
@@ -110,7 +104,12 @@ log_filename = 'AutoCallPathVerify.log'
 DEBUG=logging.DEBUG
 INFO=logging.INFO
 
-#just because I hate strings in code
+#Telnet Globals
+con=telnetlib.Telnet()
+con2=telnetlib.Telnet()
+neo_con=telnetlib.Telnet()
+
+#Bulk Call Globals
 db=" detect-battery\n"      
 flash=" flash 10\n"                 
 listen6=" listen 8000 6"
@@ -123,65 +122,60 @@ tn="telnet "
 sls=" supervision loop-start\n"
 spi="show power inline "
 
-#Add SIP Phone dictionaries
-
-#VVX300
+#SIP Phone Globals
 SIP_300={pType:IP, name:"POLYCOM VVX300", IP:"10.10.10.101", number:"5551111", alias:"1111", port:"0/1"}
-#VVX310
 SIP_310={pType:IP, name:"POLYCOM VVX310", IP:"10.10.10.102", number:"5551112", alias:"1112", port:"0/2"}
-#VVX40
 SIP_400={pType:IP, name:"POLYCOM VVX400", IP:"10.10.10.103", number:"5551113", alias:"1113", port:"0/3"}
-#VVX410
 SIP_410={pType:IP, name:"POLYCOM VVX410", IP:"10.10.10.104", number:"5551114", alias:"1114", port:"0/4"}
-#VVX500
 SIP_500={pType:IP, name:"POLYCOM VVX500", IP:"10.10.10.105", number:"5551115", alias:"1115", port:"0/5"}
-
-
 NV7100_SIP_400={pType:IP, name:"NV7100 POLYCOM VVX400 THROUGH SIP TRUNK", IP:"10.17.235.71:111", number:"5552221", port:"0/0 at BC2"}
 
-#Add Bulk Caller Phone Dictionaries
+#FXS Analog Globals
 BC_A={pType:BC, name:"NEO ANALOG FXS 0/1", IP:False, number:"5551011", port:"0/7"}
 BC_B={pType:BC, name:"NEO ANALOG FXS 0/2", IP:False, number:"5551012", port:"0/6"}
 
-#Add 
+#PRI Analog Globals 
 PRI2FXO_A={pType:BC, name:"ATLAS ANALOG THROUGH PRI", IP:False, number:"5581011", port:"0/8"}
-#Calling Analog
+
+#FXO Globals
+#Calling Analog Through FXO
 NEO2FXO_A={pType:BC, name:"ATLAS ANALOG THROUGH NEO TRUNK T10", IP:False, number:"5591011", port:"0/8"}
 NEO2FXO_B={pType:BC, name:"ATLAS ANALOG THROUGH NEO TRUNK T02", IP:False, number:"5592011", port:"0/8"}
 NEO2FXO_C={pType:BC, name:"ATLAS ANALOG THROUGH NEO TRUNK T03", IP:False, number:"5593011", port:"0/8"}
 NEO2FXO_D={pType:BC, name:"ATLAS ANALOG THROUGH NEO TRUNK T04", IP:False, number:"5594011", port:"0/8"}
 NEO2FXO_E={pType:BC, name:"ATLAS ANALOG THROUGH NEO TRUNK T05", IP:False, number:"5595011", port:"0/8"}
 NEO2FXO_F={pType:BC, name:"ATLAS ANALOG THROUGH NEO TRUNK T06", IP:False, number:"5596011", port:"0/8"}
-
+#Calling FXO
 NEO_01={pType:IP, name:"VVX300 THROUGH FXO 0/1 T10", IP:"10.10.10.101", number:"5561011", port:"0/1"} 
 NEO_02={pType:IP, name:"VVX310 THROUGH FXO 0/2 T02", IP:"10.10.10.102", number:"5562011", port:"0/2"} 
 NEO_03={pType:IP, name:"VVX400 through FXO 0/3 T03", IP:"10.10.10.103", number:"5563011", port:"0/3"} 
 NEO_04={pType:IP, name:"VVX410 THROUGH FXO 0/4 T04", IP:"10.10.10.104", number:"5564011", port:"0/4"} 
 NEO_05={pType:IP, name:"VVX500 THROUGH FXO 0/5 T05", IP:"10.10.10.105", number:"5565011", port:"0/5"} 
-#~ NEO_06={pType:IP, name:"VVX500 THROUGH FXO 0/6 T06", IP:"10.10.10.105", number:"5566011", port:"0/5"}
 NEO_06={pType:BC, name:"NEO ANALOG FXS 0/1 THROUGH FXO 0/6 T06", IP:False, number:"5566011", port:"0/7"}
 
-#Tuples of Phones
+#Tuples Phones
 SIP_LOCAL=(SIP_300,SIP_310,SIP_400,SIP_410,SIP_500)
-
 ANALOG_LOCAL=(BC_A, BC_B)
-
 LOCAL_PHONES=SIP_LOCAL+ANALOG_LOCAL
-
 ATLAS_ANALOG_NUM=(PRI2FXO_A, NEO2FXO_A, NEO2FXO_B, NEO2FXO_C, NEO2FXO_D, NEO2FXO_E, NEO2FXO_F)
-
 NEO_TRUNK_NUM=(NEO_01, NEO_02, NEO_03, NEO_04, NEO_05, NEO_06)
 
-BC_PORTS=('0/0 at BC2','0/1','0/2','0/3','0/4','0/5','0/6','0/7','0/8')
-
 #Ports and addresses
-DoorRelayPort="0/24" #NV6355 Port
-
+DOOR_RELAY_PORT="0/24" #NV6355 Port
+BC_PORTS=('0/0 at BC2','0/1','0/2','0/3','0/4','0/5','0/6','0/7','0/8') #Tuple of Bulk Callers's ports
 ROUTER="10.17.235.254"
 BULK_CALLER="10.10.10.16"
 BULK_CALLER_2="10.10.10.17"
 NV6355="10.10.10.55"
 NEO="10.10.10.254"
+
+#Voicemail Call types
+VMAIL_MSG_BUTTON,VMAIL_STAR98,VMAIL_DIR_EXT,VMAIL_LOGIN_EXT = range(4)
+VMAIL_LOGIN_EXTExt="8500"
+VM_PROMPT_MAILBOX="366#"
+VM_PROMPT_PASSWORD="971#"
+VM_PROMPT_PERSON_AT_EXT="1005#"
+VM_PROMPT_IS_UNAVAILABLE="1006#"
 
 log=logging.getLogger('AutoVerify')
 #hdlr=logging.FileHandler('auto.log')
@@ -261,7 +255,6 @@ def isConnected(A):
 
 def call(A, B, inHeadsetMode):
   """
-  TODO:  Add functionality to initiate from BC
   A calls B and if A is not in headeset mode, goes to headset mode
   """
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
@@ -270,23 +263,15 @@ def call(A, B, inHeadsetMode):
     PAYLOAD=(PAYLOAD_A + "tel:\\"+B[number]+ PAYLOAD_B)
     result=sendCurl(PAYLOAD, URL)
     if not inHeadsetMode:
-      pressHeadset(A)
+      pressKey(A,"Headset")
   elif A[pType]==BC: #will only be in BULK_CALLER 
     baseCommand="script-manager fxo %s " % (A[port],)
-    #cmd=baseCommand + db
-    #con.write(cmd)
-    #time.sleep(1)
-    #cmd=baseCommand + on
-    #con.write(cmd)
-    #time.sleep(1)
-    cmd=baseCommand + seize
-    con.write(cmd)
+    con.write(baseCommand + seize)
     time.sleep(1)
-    cmd=baseCommand + dial + B[number] + '\n'
-    con.write(cmd)
+    con.write(baseCommand + dial + B[number] + '\n')
     time.sleep(1)
   else :
-	log.error("Unknown pType %s" %A[pType])
+	log.error("Unknown pType %s" %A[pType]) 
 	exit()
   
 def connect(A):
@@ -297,7 +282,7 @@ def connect(A):
   """
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if A[pType]==IP:
-    pressHeadset(A)
+    pressKey(A,"Headset")
   elif A[pType]==BC:
     goOffHook(A)
     
@@ -312,7 +297,7 @@ def disconnect(A):
     state=sendPoll(A)
     try:
       if state['CallState']=="Connected":
-        pressEndCall(A)
+        pressKey(A,"Softkey2") #Softkey to end call
     except Exception:
       pass
   elif A[pType]==BC:
@@ -325,23 +310,14 @@ def attendedTransfer(A, C):
   """
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if isConnected(A):
-    if A[pType] == IP:
-      PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
-      URL=constructPushURL(A)
-      sendCurl(PAYLOAD, URL)
-    else:
-      baseCommand="script-manager fxo %s " % (port,)
-      cmd=baseCommand + flash
+    pressKey(A,"Transfer")
     call(A,C, True)
     while not isRinging(C):
       time.sleep(1)
     connect(C)
     verifyCallPath(A, C, 'attended transfer call AC')
     time.sleep(3)
-    if A[pType] == IP:
-      PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
-      URL=constructPushURL(A)
-      sendCurl(PAYLOAD, URL)
+    pressKey(A,"Transfer")
     disconnect(A)
 
 def unattendedTransfer(A, C):
@@ -351,20 +327,9 @@ def unattendedTransfer(A, C):
   """
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if isConnected(A):
-    if A[pType] == IP:
-      PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
-      URL=constructPushURL(A)
-      sendCurl(PAYLOAD, URL)
-    else:
-      baseCommand="script-manager fxo %s " % (port,)
-      cmd=baseCommand + flash
+    pressKey(A,"Transfer")
     call(A, C, True)
-    while not isRinging(C):
-      time.sleep(1)
-    if A[pType] == IP:
-      PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
-      URL=constructPushURL(A)
-      sendCurl(PAYLOAD, URL)
+    pressKey(A,"Transfer")
     while not isRinging(C):
       time.sleep(1)
     time.sleep(1)
@@ -376,12 +341,8 @@ def blindTransfer(A, C):
   """
   #log.debug('%s called from %s with %s' %(getFunctionName(), getCallingModuleName(),  getArguments(inspect.currentframe())))
   if isConnected(A):
-    URL=constructPushURL(A)
-    PAYLOAD=(PAYLOAD_A+"Key:Transfer"+PAYLOAD_B)
-    sendCurl(PAYLOAD, URL)
-    URL=constructPushURL(A)
-    PAYLOAD=(PAYLOAD_A+"Key:Softkey3"+PAYLOAD_B)
-    sendCurl(PAYLOAD, URL)
+    pressKey(A,"Transfer")
+    pressKey(A,"Softkey3") #Key to transfer blind
     initializeCall(A, C, 'blind transfer call leg BC', log, True)
 
 def constructPushURL(A):
@@ -478,9 +439,8 @@ def sendTones(A, number):
 
 def maxVolume(A):
   for i in range(10):
-    payload=(PAYLOAD_A+"Key:VolUp"+PAYLOAD_B)
-    url=constructPushURL(A)
-    sendCurl(payload, url)
+    pressKey(A,"VolUp")
+
   
 def pressConference(A):
   """
@@ -492,19 +452,28 @@ def pressConference(A):
   callState=state["CallState"]
   
   if callState=="Connected":
-    PAYLOAD=(PAYLOAD_A+"Key:Conference"+PAYLOAD_B)
+    pressKey(A,"VolUp")
+
+
+def pressKey(A, key):
     URL=constructPushURL(A)
+    PAYLOAD=(PAYLOAD_A+"Key:"+key+PAYLOAD_B)
     sendCurl(PAYLOAD, URL)
 
-def pressHeadset(A):
-    URL=constructPushURL(A)
-    PAYLOAD=(PAYLOAD_A+"Key:Headset"+PAYLOAD_B)
-    sendCurl(PAYLOAD, URL)
-
-def pressEndCall(A):
-    URL=constructPushURL(A)
-    PAYLOAD=(PAYLOAD_A+"Key:Softkey2"+PAYLOAD_B)
-    sendCurl(PAYLOAD, URL)
+#~ def pressHeadset(A):
+    #~ URL=constructPushURL(A)
+    #~ PAYLOAD=(PAYLOAD_A+"Key:Headset"+PAYLOAD_B)
+    #~ sendCurl(PAYLOAD, URL)
+#~ 
+#~ def pressEndCall(A):
+    #~ URL=constructPushURL(A)
+    #~ PAYLOAD=(PAYLOAD_A+"Key:Softkey2"+PAYLOAD_B)
+    #~ sendCurl(PAYLOAD, URL)
+#~ 
+#~ def pressMessages(A):
+    #~ URL=constructPushURL(A)
+    #~ PAYLOAD=(PAYLOAD_A+"Key:Messages"+PAYLOAD_B)
+    #~ sendCurl(PAYLOAD, URL)
 
 def goOffHook(A):
   success="to Connected"
@@ -577,6 +546,23 @@ def login(telnetCon=0):
   telnetCon.expect([prompt])
   return prompt
 
+def resetPort(port):
+  BC2found = bool(port.find("BC2")+1)
+  if BC2found:
+    telnetCon=con2 # Log in to Bulk Caller 2
+  else:
+    telnetCon=con # Log in to Bulk Caller 1
+
+  telnetCon.write("configure terminal\n")
+  time.sleep(1)
+  telnetCon.write("interface fxo %s\n"%(port[0:3],))
+  telnetCon.write("shutdown\n")
+  time.sleep(1)
+  telnetCon.write("no shutdown\n")
+  time.sleep(1)
+  telnetCon.write("exit\n")
+  telnetCon.write("exit\n")
+
 def initializePort(port):
   """
   Takes connection and FXO port number (string)
@@ -635,6 +621,7 @@ def listenForTones(port, time='10000', tones='1'):
   Takes a port in Connected State and
   listens for $time MS for $tones tones
   """
+  #Determine correct Bulk Caller
   BC2found = bool(port.find("BC2")+1)
   if BC2found:
     telnetCon=con2 # Log in to Bulk Caller 2
@@ -642,6 +629,41 @@ def listenForTones(port, time='10000', tones='1'):
     telnetCon=con # Log in to Bulk Caller 1
   cmd="script-manager fxo %s listen %s %s\n" % (port[0:3], time, tones)
   telnetCon.write(cmd)
+
+def verifyVoicemailTalkPath(A,tone):
+  if A[pType]==IP:
+    initializeSIP(A[port])
+  log.info("Listening for %s on fxo %s:"%(tone,A[port]))
+  listenForTones(A[port],tones=len(tone)) #listen to the two tones
+  BC2foundA = bool(A[port].find("BC2")+1)
+  #Determine listening Bulk Caller
+  if BC2foundA:
+    telnetCon=con2 # Log in to Bulk Caller 2
+  else:
+    telnetCon=con # Log in to Bulk Caller 1
+  result=telnetCon.expect([BC_RESPONSE,], 10)
+  try:
+    while (result[1].group(1) not in [A[port][0:3],]) or (result[1].group(2) not in ['5001','5000']):
+      result=telnetCon.expect([BC_RESPONSE,], 15)
+    log.info("%s: received (%s) on fxo %s" %(result[1].group(2), result[1].group(4), A[port]))
+    if result[1].group(2)=="5001":
+      #Check if the dtmf tones in tone are found in prompt
+      correctTones=True
+      for i in range(len(tone)):
+        if result[1].group(4).find(tone[i]) == -1:
+          correctTones=False
+      if correctTones:
+        success=True
+      else:
+        log.error("Wrong Tone detected - In incorrect menu")
+        success=False
+    else:
+      log.error("Error: %s: (%s)" %result[1].group(3). result[1].group(4))
+      success=False
+  except:
+    log.error("Error: unknown return value")
+  time.sleep(5) #peridoic tests
+  return success
 
 def verifyTalkPath(A, B, callType):
   """
@@ -663,8 +685,8 @@ def verifyTalkPath(A, B, callType):
     count +=1
     BC2foundA=False
     BC2foundB=False
-    tonesA='333333'
-    tonesB='444444'
+    tonesA='333'
+    tonesB='444'
     if B[pType]==BC:
       listenForTones(A[port], time=12000)
     else:
@@ -678,9 +700,11 @@ def verifyTalkPath(A, B, callType):
     else:
       telnetCon=con # Log in to Bulk Caller 1
     result=telnetCon.expect([BC_RESPONSE,], 10)
+    log.info(result)
     try:
       while result[1].group(2) not in ['5000', '5001']:
         result=telnetCon.expect([BC_RESPONSE,], 15)
+        log.info(result)
       log.info("%s: received (%s) on fxo %s" %(result[1].group(2), result[1].group(4), A[port]))
       if result[1].group(2)=="5001":
         successBA+=1
@@ -698,6 +722,7 @@ def verifyTalkPath(A, B, callType):
     time.sleep(2)#pause for BC
     log.info("Listening for a %s on fxo %s: %s -> %s"%(tonesB[0], B[port], A[name], B[name]))
     sendTones(A, tonesB)
+    #Determine listening Bulk Caller
     BC2foundB = bool(B[port].find("BC2")+1)
     if BC2foundB:
       telnetCon=con2 # Log in to Bulk Caller 2
@@ -910,6 +935,45 @@ def blindTransferCall(A, B, C):
   disconnect(B)
   disconnect(A)
   return passed
+
+#Testing for voicemail
+def voicemailCall(A, callType, B={}):
+  """
+  Calls voicemail through various sources. Verifies until password prompt
+  """
+  passed=False
+  if A[port]:
+    initializePort(A[port])
+  time.sleep(5)
+  pressKey(A,"Headset")
+  if callType==VMAIL_MSG_BUTTON:
+    pressKey(A,"Messages")
+    log.info("Pressing Messages button",)
+    passed=verifyVoicemailTalkPath(A, VM_PROMPT_PASSWORD) #Check if in password prompt
+  elif callType==VMAIL_STAR98: 
+    call(A,{number:'*98',},True)
+    log.info("Calling *98",)
+    passed=verifyVoicemailTalkPath(A, VM_PROMPT_PASSWORD) #Check if in password prompt
+  elif callType==VMAIL_DIR_EXT: 
+    call(A,B,True)
+    log.info("% calling extension %s"%(A[number],B[number]))
+    if verifyVoicemailTalkPath(A, VM_PROMPT_IS_UNAVAILABLE):
+      pressKey(A, "DialPadStar") # Go to voicemail
+    if verifyVoicemailTalkPath(A, VM_PROMPT_MAILBOX): # Check if in mailbox prompt 
+      pressKey(A, "DialPadPound")
+      pressKey(A, "DialPadPound")
+      passed=verifyVoicemailTalkPath(A, VM_PROMPT_PASSWORD) #Check if in password prompt
+  elif callType==VMAIL_LOGIN_EXT:
+    call(A,{number:VMAIL_LOGIN_EXTExt,},True)
+    log.info("Calling voicemail login extension %s"%(VMAIL_LOGIN_EXTExt,))
+    if verifyVoicemailTalkPath(A, VM_PROMPT_MAILBOX): # Check if in mailbox prompt 
+      pressKey(A, "DialPadPound")
+      pressKey(A, "DialPadPound")
+      passed=verifyVoicemailTalkPath(A, VM_PROMPT_PASSWORD) #Check if in password prompt
+  else:
+    log.error("Unknown Voicemail Call Type")
+  disconnect(A)
+  return passed 
   
 def setupLogging(level):
   log=logging.getLogger('AutoVerify')
@@ -942,6 +1006,7 @@ def callerIDtest(A,B):
 def initializeTest(ipA, ipB, level, testType):
   """
   creates connection to bulk caller
+  initializes ports in bulk callers
   returns telnet connection
   """
   global PROMPT
@@ -976,20 +1041,12 @@ def finalizeTest():
   log_output = log_file.read()
   result_file = open("Test_Results_Phone_Calls.log", 'w')
   result_file.write('#### TEST RESULTS #####\n\n')
-  for result in RESULTS:
+  for result in RESULTS: #Write summary of tests
     result_file.write(result + '\n')
   print(log_output)
-  result_file.write(log_output)
+  result_file.write(log_output) #Write log file
   log_file.close()
   result_file.close()
-
-def shutNoShutFxo(port):
-  neo_con.write("configure terminal\n")
-  neo_con.write("interface fxo " + port + '\n')
-  neo_con.write("shutdown\n")
-  time.sleep(1)
-  neo_con.write("no shutdown\n")
-  neo_con.write("exit\n")
 
 def passFailCheck(passed):
   if passed:
@@ -1029,8 +1086,8 @@ def test():
   for i in range(runs):
     log.info("NORMAL CALL LOCAL SIP-SIP VERIFICATION####################################")
     passedA = normalCall(SIP_300,SIP_310)
-    passedB = normalCall(SIP_310,SIP_400)
-    passedC = normalCall(SIP_400,SIP_410)
+    passedB = normalCall(SIP_410,SIP_400)
+    passedC = normalCall(SIP_500,SIP_410)
     passed = passedA and passedB and passedC
     RESULTS.append("    NORMAL CALL LOCAL SIP-SIP VERIFICATION----------------------------%s"%(passFailCheck(passed)))
   for i in range(runs):
@@ -1090,6 +1147,8 @@ def test():
 
   log.info("Re-initializing Ports...")
   for i in BC_PORTS:
+    resetPort(i)
+  for i in BC_PORTS:
     initializePort(i)
 
   RESULTS.append("\nCALL TRANSFERS")
@@ -1133,6 +1192,8 @@ def test():
 
   log.info("Re-initializing Ports...")
   for i in BC_PORTS:
+    resetPort(i)
+  for i in BC_PORTS:
     initializePort(i)
 
   RESULTS.append("  UNATTENDED TRANSFERS")
@@ -1150,30 +1211,38 @@ def test():
     RESULTS.append("    UNATTENDED CALL TRANSFER T1/PRI VERIFICATION----------------------%s"%(passFailCheck(passed)))
   for i in range(runs):
     log.info("UNATTENDED CALL TRANSFER FXO 0/1 VERIFICATION#############################")
+    log.info("SKIPPED(AOS-11557)\n")
     passed = unattendedTransferCall(SIP_400,NEO2FXO_A,SIP_410)
     RESULTS.append("    UNATTENDED CALL TRANSFER FXO 0/1 CALL VERIFICATION----------------%s"%(passFailCheck(passed)))
   for i in range(runs):
     log.info("UNATTENDED CALL TRANSFER FXO 0/2 VERIFICATION#############################")
+    log.info("SKIPPED(AOS-11557)\n")
     #~ passed = unattendedTransferCall(SIP_400,NEO2FXO_B,SIP_410)
     RESULTS.append("    UNATTENDED CALL TRANSFER FXO 0/2 CALL VERIFICATION----------------%sAOS-11557"%(passFailCheck(False)))
   for i in range(runs):
     log.info("UNATTENDED CALL TRANSFER FXO 0/3 VERIFICATION#############################")
+    log.info("SKIPPED(AOS-11557)\n")
     #~ passed = unattendedTransferCall(SIP_400,NEO2FXO_C,SIP_410)
     RESULTS.append("    UNATTENDED CALL TRANSFER FXO 0/3 CALL VERIFICATION----------------%sAOS-11557"%(passFailCheck(False)))
   for i in range(runs):
     log.info("UNATTENDED CALL TRANSFER FXO 0/4 VERIFICATION#############################")
+    log.info("SKIPPED(AOS-11557)\n")
     #~ passed = unattendedTransferCall(SIP_400,NEO2FXO_D,SIP_410)
     RESULTS.append("    UNATTENDED CALL TRANSFER FXO 0/4 CALL VERIFICATION----------------%sAOS-11557"%(passFailCheck(False)))
   for i in range(runs):
     log.info("UNATTENDED CALL TRANSFER FXO 0/5 VERIFICATION#############################")
+    log.info("SKIPPED(AOS-11557)\n")
     #~ passed = unattendedTransferCall(SIP_400,NEO2FXO_E,SIP_410)
     RESULTS.append("    UNATTENDED CALL TRANSFER FXO 0/5 CALL VERIFICATION----------------%sAOS-11557"%(passFailCheck(False)))
   for i in range(runs):
     log.info("UNATTENDED CALL TRANSFER FXO 0/6 VERIFICATION#############################")
+    log.info("SKIPPED(AOS-11557)\n")
     #~ passed = unattendedTransferCall(SIP_400,NEO2FXO_F,SIP_410)
     RESULTS.append("    UNATTENDED CALL TRANSFER FXO 0/6 CALL VERIFICATION----------------%sAOS-11557"%(passFailCheck(False)))
 
   log.info("Re-initializing Ports...")
+  for i in BC_PORTS:
+    resetPort(i)
   for i in BC_PORTS:
     initializePort(i)
 
@@ -1196,27 +1265,34 @@ def test():
     RESULTS.append("    BLIND CALL TRANSFER FXO 0/1 CALL VERIFICATION---------------------%s"%(passFailCheck(passed)))
   for i in range(runs):
     log.info("BLIND CALL TRANSFER FXO 0/2 VERIFICATION##################################")
+    log.info("SKIPPED(AOS-11557)\n")
     #~ passed = blindTransferCall(SIP_400,NEO2FXO_B,SIP_410)
     RESULTS.append("    BLIND CALL TRANSFER FXO 0/2 CALL VERIFICATION---------------------%sAOS-11557"%(passFailCheck(False)))
   for i in range(runs):
     log.info("BLIND CALL TRANSFER FXO 0/3 VERIFICATION##################################")
+    log.info("SKIPPED(AOS-11557)\n")
     #~ passed = blindTransferCall(SIP_400,NEO2FXO_C,SIP_410)
     RESULTS.append("    BLIND CALL TRANSFER FXO 0/3 CALL VERIFICATION---------------------%sAOS-11557"%(passFailCheck(False)))
   for i in range(runs):
     log.info("BLIND CALL TRANSFER FXO 0/4 VERIFICATION##################################")
+    log.info("SKIPPED(AOS-11557)\n")
     #~ passed = blindTransferCall(SIP_400,NEO2FXO_D,SIP_410)
     RESULTS.append("    BLIND CALL TRANSFER FXO 0/4 CALL VERIFICATION---------------------%sAOS-11557"%(passFailCheck(False)))
   for i in range(runs):
     log.info("BLIND CALL TRANSFER FXO 0/5 VERIFICATION##################################")
+    log.info("SKIPPED(AOS-11557)\n")
     #~ passed = blindTransferCall(SIP_400,NEO2FXO_E,SIP_410)
     RESULTS.append("    BLIND CALL TRANSFER FXO 0/5 CALL VERIFICATION---------------------%sAOS-11557"%(passFailCheck(False)))
   for i in range(runs):
     log.info("BLIND CALL TRANSFER FXO 0/6 VERIFICATION##################################")
+    log.info("SKIPPED(AOS-11557)\n")
     #~ passed = blindTransferCall(SIP_400,NEO2FXO_F,SIP_410)
     RESULTS.append("    BLIND CALL TRANSFER FXO 0/6 CALL VERIFICATION---------------------%sAOS-11557"%(passFailCheck(False)))
 
 
   log.info("Re-initializing Ports...")
+  for i in BC_PORTS:
+    resetPort(i)
   for i in BC_PORTS:
     initializePort(i)
 
@@ -1258,7 +1334,61 @@ def test():
     passed = conferenceCall(SIP_310,NEO2FXO_F,SIP_500)
     RESULTS.append("    CONFERENCE CALL FXO 0/6 VERIFICATION------------------------------%s"%(passFailCheck(passed)))
 
-  RESULTS.append("\nVOICEMAIL(TBD)")
+  log.info("Re-initializing Ports...")
+  for i in BC_PORTS:
+    resetPort(i)
+  for i in BC_PORTS:
+    initializePort(i)
+
+  RESULTS.append("\nVOICEMAIL")
+  RESULTS.append("  LOCAL SIP VOICEMAIL")
+  for i in range(runs):
+    log.info("VOICEMAIL LOCAL SIP MESSAGES BUTTON VERIFICATION##########################")
+    passed = voicemailCall(SIP_300,VMAIL_MSG_BUTTON)
+    RESULTS.append("    VOICEMAIL LOCAL SIP MESSAGES BUTTON VERIFICATION------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("VOICEMAIL LOCAL SIP *98 VERIFICATION######################################")
+    passed = voicemailCall(SIP_300,VMAIL_STAR98)
+    RESULTS.append("    VOICEMAIL LOCAL SIP *98 VERIFICATION------------------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("VOICEMAIL LOCAL SIP DIRECT EXTENSION VERIFICATION#########################")
+    passed = voicemailCall(SIP_300,VMAIL_DIR_EXT,SIP_300)
+    RESULTS.append("    VOICEMAIL LOCAL SIP LOGIN EXTENSION BUTTON VERIFICATION-----------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("VOICEMAIL LOCAL SIP LOGIN EXTENSION BUTTON VERIFICATION###################")
+    passed = voicemailCall(SIP_300,VMAIL_LOGIN_EXT)
+    RESULTS.append("    VOICEMAIL LOCAL SIP LOGIN EXTENSION BUTTON VERIFICATION-----------%s"%(passFailCheck(passed)))
+
+  RESULTS.append("  LOCAL FXS VOICEMAIL")
+  for i in range(runs):
+    log.info("VOICEMAIL LOCAL FXS STAR 98 VERIFICATION##################################")
+    passed = voicemailCall(BC_A,VMAIL_STAR98)
+    RESULTS.append("    VOICEMAIL LOCAL FXS STAR 98 BUTTON VERIFICATION-------------------%s"%(passFailCheck(passed)))
+  for i in range(runs):
+    log.info("VOICEMAIL LOCAL FXS DIRECT EXTENSION VERIFICATION#########################")
+    passed = voicemailCall(BC_A,VMAIL_DIR_EXT)
+    RESULTS.append("    VOICEMAIL LOCAL FXS LOGIN EXTENSION BUTTON VERIFICATION-----------%s"%(passFailCheck(passed)))
+
+  RESULTS.append("  FXO VOICEMAIL")
+  for i in range(runs):
+    log.info("VOICEMAIL FXO DIRECT EXTENSION VERIFICATION###############################")
+    passed = voicemailCall(PRI2FXO_A,VMAIL_DIR_EXT,NEO_01)
+    RESULTS.append("    VOICEMAIL LOCAL FXS DIRECT EXTENSION VERIFICATION-----------------%s"%(passFailCheck(passed)))
+
+  RESULTS.append("  T1/PRI VOICEMAIL")
+  for i in range(runs):
+    log.info("VOICEMAIL LOCAL T1/PRI DIRECT EXTENSION VERIFICATION######################")
+    passed = voicemailCall(PRI2FXO_A,VMAIL_DIR_EXT,SIP_300)
+    RESULTS.append("    VOICEMAIL LOCAL FXS DIRECT EXTENSION VERIFICATION-----------------%s"%(passFailCheck(passed)))
+
+  RESULTS.append("  SIP TRUNK VOICEMAIL")
+  for i in range(runs):
+    log.info("VOICEMAIL SIP TRUNK STAR 98 VERIFICATION##################################")
+    passed = voicemailCall(NV7100_SIP_400,VMAIL_DIR_EXT,SIP_300)
+    RESULTS.append("    VOICEMAIL LOCAL FXS DIRECT EXTENSION VERIFICATION-----------------%s"%(passFailCheck(passed)))
+
+
+
 
   RESULTS.append("\nAUTO-ATTENDANT(TBD)")
 
