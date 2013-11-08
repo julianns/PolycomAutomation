@@ -132,7 +132,7 @@ SIP_410={pType:IP, name:"POLYCOM VVX410", IP:"10.10.10.104", number:"5551114", a
 #VVX500
 SIP_500={pType:IP, name:"POLYCOM VVX500", IP:"10.10.10.105", number:"5551115", alias:"1115", port:"0/5"}
 
-NV7100_SIP_400={pType:IP, name:"NV7100 POLYCOM VVX500 THROUGH SIP TRUNK", IP:"10.17.235.71:111", number:"5552221", port:"0/0"}
+NV7100_SIP_400={pType:IP, name:"NV7100 POLYCOM VVX400 THROUGH SIP TRUNK", IP:"10.17.235.71:111", number:"5552221", port:"0/5"}
 
 #Add Bulk Caller Phone Dictionaries
 BC_A={pType:BC, name:"NEO ANALOG FXS 0/1", IP:False, number:"5551011", port:"0/7"}
@@ -153,7 +153,7 @@ NEO_02={pType:IP, name:"VVX310 THROUGH FXO 0/2 T02", IP:"10.10.10.102", number:"
 NEO_03={pType:IP, name:"VVX400 through FXO 0/3 T03", IP:"10.10.10.103", number:"5563011", port:"0/3"} 
 NEO_04={pType:IP, name:"VVX410 THROUGH FXO 0/4 T04", IP:"10.10.10.104", number:"5564011", port:"0/4"} 
 NEO_05={pType:IP, name:"VVX500 THROUGH FXO 0/5 T05", IP:"10.10.10.105", number:"5565011", port:"0/5"} 
-NEO_06={pType:BC, name:"VVX500 THROUGH FXO 0/6 T06", IP:False, number:"5566011", port:"0/7"} 
+NEO_06={pType:IP, name:"VVX500 THROUGH FXO 0/6 T06", IP:"10.10.10.105", number:"5566011", port:"0/5"} 
 
 DoorRelayPort="0/24"
 
@@ -606,25 +606,30 @@ def verifyTalkPath(A, B, callType):
     initializeSIP(A[port])
   if B[pType]==IP:
     initializeSIP(B[port])
+
   while count<1.0:
     count +=1
+    BC2foundA=False
+    BC2foundB=False
     tonesA='333'
     tonesB='444'
+    toneLen='3'
     if B[pType]==BC:
-      listenForTones(A[port], time=12000)
+      listenForTones(A[port], time=12000,tones=toneLen)
     else:
-      listenForTones(A[port])
+      listenForTones(A[port],tones=toneLen)
     time.sleep(2)#pause for BC
     log.info("Listening for a %s on fxo %s: %s -> %s"%(tonesA[0], A[port], B[name], A[name]))
-    if B[pType]==IP:
-      sendTones(B, tonesA)
-      #sendKeyPress(B, tonesA)
+    sendTones(B, tonesA)
+    BC2foundA = bool(A[port].find("BC2")+1)
+    if BC2foundA:
+      telnetCon=con2 # Log in to Bulk Caller 2
     else:
-      sendTones(B, tonesA)
-    result=con.expect([BC_RESPONSE,], 10)
+      telnetCon=con # Log in to Bulk Caller 1
+    result=telnetCon.expect([BC_RESPONSE,], 10)
     try:
       while result[1].group(2) not in ['5000', '5001']:
-        result=con.expect([BC_RESPONSE,], 15)
+        result=telnetCon.expect([BC_RESPONSE,], 15)
       log.info("%s: received (%s) on fxo %s" %(result[1].group(2), result[1].group(4), A[port]))
       if result[1].group(2)=="5001":
         successBA+=1
@@ -632,22 +637,26 @@ def verifyTalkPath(A, B, callType):
         log.error("Error: %s: (%s)" %result[1].group(3). result[1].group(4))
     except:
       log.error("Error: unknown return value")
+
     time.sleep(5)
+
     if A[pType]==BC:
-      listenForTones(B[port], time=12000)
+      listenForTones(B[port], time=12000,tones=toneLen)
     else:
-      listenForTones(B[port])
+      listenForTones(B[port],tones=toneLen)
     time.sleep(2)#pause for BC
     log.info("Listening for a %s on fxo %s: %s -> %s"%(tonesB[0], B[port], A[name], B[name]))
-    if A[pType]==IP:
-      sendTones(A, tonesB)
-      #sendKeyPress(A, tonesB)
+    sendTones(A, tonesB)
+    #Determine listening Bulk Caller
+    BC2foundB = bool(B[port].find("BC2")+1)
+    if BC2foundB:
+      telnetCon=con2 # Log in to Bulk Caller 2
     else:
-      sendTones(A, tonesB)
-    result=con.expect([BC_RESPONSE,], 10)
+      telnetCon=con # Log in to Bulk Caller 1
+    result=telnetCon.expect([BC_RESPONSE,], 10)
     try:
       while result[1].group(2) not in ['5000', '5001']:
-        result=con.expect([BC_RESPONSE,], 15)
+        result=telnetCon.expect([BC_RESPONSE,], 15)
       log.info("%s: received (%s) on fxo %s" %(result[1].group(2), result[1].group(4), B[port]))
       if result[1].group(2)=="5001":
         successAB+=1
@@ -874,7 +883,7 @@ def initializeTest(ip, level, testType):
  
   
 def finalizeTest():
-  log.info('\n\n#### TEST RESULTS #####\n\n')
+  log.info('\n\n#### TEST SUMMARY #####\n\n')
   #~ for result in RESULTS:
     #~ log.info(result)
   log_file = open(log_filename)
@@ -977,6 +986,7 @@ def saveConfig(config_name):
   con.write(cmd)
   login()
   cmd="copy start %s.cfg"%(config_name)
+  con.write("exit\n")
 
 def test():
   """
@@ -988,7 +998,7 @@ def test():
   open(log_filename, 'w').close()
   log.info("Neo Hardware Verification Test")
   RESULTS.append("Neo Hardware Verification Test")
-  runs = 0
+  runs = 1
 
 #Door Relay Testing
   initializeTest(NV6355, INFO, "NV6355 Telnet Connection")
@@ -1000,7 +1010,7 @@ def test():
     RESULTS.append("DOOR RELAY VERIFICATION---------------------%s"%(passFailCheck(passed)))
 
 #Phone Calls Testing
-  initializeTest(BULK_CALLER, INFO, "Telnet Connections to Bulk Callers")  
+  initializeTest(BULK_CALLER, INFO, "Neo Telnet Connection")  
   for i in range(runs):
 		#SIP to SIP local
     log.info("LAN VERIFICATION#################################")
@@ -1034,7 +1044,7 @@ def test():
     RESULTS.append("FXS 0/2 VERIFICATION------------------------%s"%(passFailCheck(passed)))
 
   #time.sleep(10)
-  for i in range(3):
+  for i in range(runs):
 		#~ #SIP to analog through T1/PRI 
     log.info("T1/PRI VERIFICATION##############################\n")
     passed_t1priA = normalCall(SIP_300,PRI2FXO_A)
@@ -1089,7 +1099,7 @@ def test():
 
   #time.sleep(10)
   for i in range(runs):
-		#~ #SIP to analog through FX0 0/7
+		#~ #SIP to analog through FX0 0/
     log.info("FXO 0/6 VERIFICATION#############################\n")
     passed_fxo06A = normalCall(SIP_300,NEO2FXO_F)
     passed_fxo06B = normalCall(PRI2FXO_A,NEO_06)
